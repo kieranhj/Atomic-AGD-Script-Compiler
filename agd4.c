@@ -669,13 +669,13 @@ unsigned const char *keywrd =
 	"DEFINEMESSAGES."	// define messages.
 
 	/* Constants. */
-	"LEFT."				// left constant (keys).
 	"RIGHT."			// right constant (keys).
-	"UP."				// up constant (keys).
+	"LEFT."				// left constant (keys).
 	"DOWN."				// down constant (keys).
+	"UP."				// up constant (keys).
+	"FIRE."				// fire constant (keys).
 	"FIRE2."			// fire2 constant (keys).
 	"FIRE3."			// fire3 constant (keys).
-	"FIRE."				// fire constant (keys).
 	"OPTION1."			// option constant (keys).
 	"OPTION2."			// option constant (keys).
 	"OPTION3."			// option constant (keys).
@@ -715,12 +715,12 @@ unsigned const char *keywrd =
 
 const short int nConstantsTable[] =
 {
-	0, 1, 2, 3, 5, 6, 4,		// keys left, right, up, down, fire, fire2, fire3.
-	7, 8, 9, 10,				// keys option1, option2, option3, option4.
-	10,							// laser bullet.
-	0, 1, 2,					// keyboard and joystick controls.
+	0, 1, 2, 3, 4, 5, 6,		// keys left, right, up, down, fire, fire2, fire3.
+	7, 8, 9, 10,			// keys option1, option2, option3, option4.
+	10,				// laser bullet.
+	0, 1, 2,			// keyboard and joystick controls.
 	0, 1, 2, 3, 4, 5, 6,		// block types.
-	EVENT_SPRITE_0,				// events.
+	EVENT_SPRITE_0,			// events.
 	EVENT_SPRITE_1,
 	EVENT_SPRITE_2,
 	EVENT_SPRITE_3,
@@ -775,8 +775,8 @@ const unsigned char cVariables[][ 7 ] =
 	"varw",				// variable.
 	"varz",				// variable.
 	"contrl",			// keyboard/Kempston/Sinclair controls.
-	"charx",			// x coordinate.
 	"chary",			// y coordinate.
+	"charx",			// x coordinate.
 	"clock",			// last clock reading.
 	"varrnd",			// last random number variable.
 	"varobj",			// last object variable.
@@ -1809,8 +1809,8 @@ void CreateObjects( void )
 		{
 			cAttr = *cSrc++;								/* get attribute. */
 			cScrn = *cSrc++;								/* get screen. */
-			cX = *cSrc++;									/* get x. */
-			cY = *cSrc++;									/* get y. */
+			cY = *cSrc++;									/* get x. */
+			cX = *cSrc++;									/* get y. */
 			WriteInstruction( ".byte " );
 
 			for( nDatum = 0; nDatum < 32; nDatum++ )
@@ -1820,19 +1820,19 @@ void CreateObjects( void )
 				WriteText( "," );
 			}
 
-			WriteNumber( cAttr );
-			WriteText( "," );
+//			WriteNumber( cAttr );
+//			WriteText( "," );
 			WriteNumber( cScrn );
-			WriteText( "," );
-			WriteNumber( cX );
 			WriteText( "," );
 			WriteNumber( cY );
 			WriteText( "," );
-			WriteNumber( cScrn );
-			WriteText( "," );
 			WriteNumber( cX );
 			WriteText( "," );
+			WriteNumber( cScrn );
+			WriteText( "," );
 			WriteNumber( cY );
+			WriteText( "," );
+			WriteNumber( cX );
 		}
 	}
 }
@@ -2919,7 +2919,7 @@ void CompileShift( short int nArg )
 		switch ( nArg )
 		{
 			case 2:
-				WriteInstruction( "lsr a" );
+				WriteInstruction( "asl a" );
 				break;
 			case 3:
 				WriteInstruction( "sta z80_d" );
@@ -2964,6 +2964,7 @@ void CompileShift( short int nArg )
 				WriteInstruction( "asl a" );
 				WriteInstruction( "asl a" );
 				break;
+// TODO .....
 			case 32:
 				WriteInstruction( "rrca" );
 				WriteInstruction( "rrca" );
@@ -3003,6 +3004,7 @@ void CompileShift( short int nArg )
 				WriteInstruction( "lsr a" );
 				WriteInstruction( "lsr a" );
 				break;
+// TODO .....
 			case 32:
 				WriteInstruction( "rlca" );
 				WriteInstruction( "rlca" );
@@ -3049,7 +3051,7 @@ void CR_Key( void )
 		nArg = GetNum( 8 );
 		if ( nArg < 7 )
 		{
-//			nArg2 = Joystick( nArg );
+			nArg2 = Joystick( nArg );
 			nArg2 = nArg;
 			WriteInstruction( "lda joyval" );
 			WriteInstruction( "and #" );
@@ -3060,8 +3062,9 @@ void CR_Key( void )
 		}
 		else
 		{
-			sprintf( szInstruction, "lda keys+%d", nArg );	/* get key from table. */
+			sprintf( szInstruction, "ldy #%d", nArg );	/* get key from table. */
 			WriteInstruction( szInstruction );
+			WriteInstruction( "lda keys,y" );
 			WriteInstruction( "jsr ktest" );					/* test it. */
 			WriteInstruction( "bcc :+" );
 			WriteInstruction( "jmp       " );
@@ -3087,13 +3090,13 @@ void CR_DefineKey( void )
 	char szInstruction[ 15 ];
 	unsigned short int nNum = NumberOnly();
 
-	WriteInstruction( "call 654" );
-	WriteInstruction( "inc e" );
-	WriteInstruction( "jr z,$-4" );
-	sprintf( szInstruction, "ld hl,keys+%d", Joystick( nNum ) );
+//	WriteInstruction( "call 654" );
+//	WriteInstruction( "inc e" );
+//	WriteInstruction( "jr z,$-4" );
+	sprintf( szInstruction, "; DEFINEKEY %d command", Joystick( nNum ) );
 	WriteInstruction( szInstruction );
-	WriteInstruction( "dec e" );
-	WriteInstruction( "ld (hl),e" );
+//	WriteInstruction( "dec e" );
+//	WriteInstruction( "ld (hl),e" );
 }
 
 void CR_Collision( void )
@@ -3226,16 +3229,18 @@ void CR_Spawn( void )
 	if ( nArg1 == INS_NUM )									/* first argument is numeric. */
 	{
 		nArg1 = GetNum( 8 );								/* store first argument. */
-		nArg2 = NextKeyword();								/* get second argument. */
+		nArg2 = NextKeyword();
+								/* get second argument. */
 		if ( nArg2 == INS_NUM )								/* second argument is numeric too. */
 		{
 //			nArg2 = 256 * GetNum( 8 ) + nArg1;
+			nArg2 = GetNum( 8 );
 			WriteInstruction( "lda #" );
 			WriteNumber( nArg1 );							/* pass both parameters as 16-bit argument. */
-			WriteInstruction( "sta z80_b");
+			WriteInstruction( "sta z80_c");
 			WriteInstruction( "lda #" );
 			WriteNumber( nArg2 );							/* pass both parameters as 16-bit argument. */
-			WriteInstruction( "sta z80_c");
+			WriteInstruction( "sta z80_b");
 		}
 		else
 		{
@@ -3307,13 +3312,13 @@ void CR_Score( void )
 	if ( nArg == INS_NUM )									/* literal number, could be 16 bits. */
 	{
 		nArg = GetNum( 16 );
-		nArg1 = nArg && 0xff;
-		nArg2 = nArg >> 8;
-		WriteInstruction( "lda #" );
-		WriteNumber( nArg1 );
+//		nArg1 = nArg && 0xff;
+//		nArg2 = nArg >> 8;
+		WriteInstruction( "lda #<" );
+		WriteNumber( nArg );
 		WriteInstruction( "sta z80_l" );
-		WriteInstruction( "lda #" );
-		WriteNumber( nArg2 );
+		WriteInstruction( "lda #>" );
+		WriteNumber( nArg );
 		WriteInstruction( "sta z80_h" );
 	}
 	else													/* work out 8-bit argument to add. */
@@ -3343,7 +3348,7 @@ void CR_ZeroBonus( void )
 {
 	WriteInstruction( "lda #48" );
 	WriteInstruction( "ldy #5" );
-	WriteText(":");
+	WriteText("\n:");
 	WriteInstruction( "sta bonus,y" );
 	WriteInstruction( "dey" );
 	WriteInstruction( "bpl :-" );
@@ -3351,7 +3356,7 @@ void CR_ZeroBonus( void )
 
 void CR_Sound( void )
 {
-	unsigned short int nArg = NextKeyword();
+//	unsigned short int nArg = NextKeyword();
 //
 //	if ( nArg == INS_NUM )									/* literal number. */
 //	{
@@ -3394,7 +3399,7 @@ void CR_Sound( void )
 
 void CR_Beep( void )
 {
-	unsigned short int nArg = NextKeyword();
+//	unsigned short int nArg = NextKeyword();
 //
 //	if ( nArg == INS_NUM )									/* literal number. */
 //	{
@@ -3418,7 +3423,7 @@ void CR_Beep( void )
 
 void CR_Crash( void )
 {
-	unsigned short int nArg = NextKeyword();
+//	unsigned short int nArg = NextKeyword();
 //
 //	if ( nArg == INS_NUM )									/* literal number. */
 //	{
@@ -3451,31 +3456,31 @@ void CR_ClS( void )
 
 void CR_Border( void )
 {
-	CompileArgument();
+//	CompileArgument();
 	WriteInstruction( "; BORDER command" );						/* address of ROM BORDER routine. */
 }
 
 void CR_Colour( void )
 {
-	CompileArgument();
+//	CompileArgument();
 	WriteInstruction( "; COLOUR command" );						/* set the permanent attributes. */
 }
 
 void CR_Paper( void )
 {
-	CompileArgument();
+//	CompileArgument();
 	WriteInstruction( "; PAPER command" );								/* multiply by 8 to get paper. */
 }
 
 void CR_Ink( void )
 {
-	CompileArgument();
+//	CompileArgument();
 	WriteInstruction( "; INK command" );
 }
 
 void CR_Clut( void )
 {
-	CompileArgument();
+//	CompileArgument();
 	WriteInstruction( "; CLUT command" );								/* multiply by 64 for colour look-up table. */
 }
 
@@ -3525,12 +3530,13 @@ void CR_At( void )
 //		if ( nArg2 == INS_NUM )								/* second argument is numeric too. */
 //		{
 //			nArg2 = 256 * GetNum( 8 ) + nArg1;	/* pass both parameters as 16-bit argument. */
+			nArg2 = GetNum( 8 );
 			WriteInstruction( "lda #" );
 			WriteNumber( nArg1 );
-			WriteInstruction( "chary");
+			WriteInstruction( "sta chary");
 			WriteInstruction( "lda #" );
 			WriteNumber( nArg2 );
-			WriteInstruction( "charx");
+			WriteInstruction( "sta charx");
 //		}
 //		else
 //		{
@@ -3543,7 +3549,7 @@ void CR_At( void )
 	else
 	{
 		CompileKnownArgument( nArg1 );						/* puts first argument into accumulator. */
-		WriteInstruction( "sta chary" );						/* copy into c register. */
+		WriteInstruction( "sta chary ;" );						/* copy into c register. */
 		CompileArgument();									/* puts second argument into accumulator. */
 		WriteInstruction( "sta charx" );						/* put that into b. */
 	}
@@ -3686,18 +3692,14 @@ void CR_Get( void )
 
 void CR_Put( void )
 {
+	CompileArgument();
+	WriteInstruction( "pha; CR_PUT" );							/* remember object number. */
 	CompileArgument();										/* put object number in accumulator. */
 	WriteInstruction( "sta dispy" );							/* remember object number. */
 	CompileArgument();
-	WriteInstruction( "sta dispx" );							/* horizontal first. */
-	CompileArgument();
+	WriteInstruction( "sta dispx" );							/* remember object number. */
+	WriteInstruction( "pla" );
 	WriteInstruction( "jsr drpob" );
-
-//	CompileArgument();
-//	WriteInstruction( "ld l,(ix+8)" );
-//	WriteInstruction( "ld h,(ix+9)" );
-//	WriteInstruction( "ld (dispx),hl" );
-//	WriteInstruction( "call drpob" );
 }
 
 void CR_RemoveObject( void )
@@ -3715,9 +3717,9 @@ void CR_DetectObject( void )
 void CR_Asm( void )											/* this is undocumented as it's dangerous! */
 {
 	unsigned short int nNum = NumberOnly();
-	WriteInstruction( "nop" );
+	WriteInstruction( ".byte " );
 
-//	WriteNumber( nNum );									/* write opcode straight to code. */
+	WriteNumber( nNum );									/* write opcode straight to code. */
 }
 
 void CR_Exit( void )
@@ -3795,38 +3797,43 @@ void CR_Divide( void )
 
 void CR_SpriteInk( void )
 {
-	CompileArgument();
-	WriteInstruction( "and #7" );
-	WriteInstruction( "sta z80_c" );
-	WriteInstruction( "jsr cspr" );
+//	CompileArgument();
+//	WriteInstruction( "and #7" );
+//	WriteInstruction( "sta z80_c" );
+//	WriteInstruction( "jsr cspr" );
+	WriteInstruction( "; SPRITEINK command" );
 }
 
 void CR_Trail( void )
 {
-	WriteInstruction( "jsr vapour" );
+//	WriteInstruction( "jsr vapour" );
+	WriteInstruction( "; VAPOUR command" );
 }
 
 void CR_Laser( void )
 {
-	CompileArgument();										/* 0 or 1 for direction. */
-	WriteInstruction( "jsr shoot" );
+//	CompileArgument();										/* 0 or 1 for direction. */
+//	WriteInstruction( "jsr shoot" );
+	WriteInstruction( "; LASER command" );
 }
 
 void CR_Star( void )
 {
-	CompileArgument();										/* direction 0 - 3. */
-	WriteInstruction( "sta z80_c" );
-	WriteInstruction( "jsr qrand" );
-	WriteInstruction( "and #3" );
-	WriteInstruction( "bne :+" );
-	WriteInstruction( "jmp star" );
-	WriteText( "\n:" );
+//	CompileArgument();										/* direction 0 - 3. */
+//	WriteInstruction( "sta z80_c" );
+//	WriteInstruction( "jsr qrand" );
+//	WriteInstruction( "and #3" );
+//	WriteInstruction( "bne :+" );
+//	WriteInstruction( "jmp star" );
+//	WriteText( "\n:" );
+	WriteInstruction( "; STAR command" );
 }
 
 void CR_Explode( void )
 {
-	CompileArgument();										/* number of particles required. */
-	WriteInstruction( "jsr explod" );
+//	CompileArgument();										/* number of particles required. */
+//	WriteInstruction( "jsr explod" );
+	WriteInstruction( "; EXPLODE command" );
 }
 
 void CR_Redraw( void )
@@ -3836,22 +3843,25 @@ void CR_Redraw( void )
 
 void CR_Silence( void )
 {
-	WriteInstruction( "jsr silenc" );
+//	WriteInstruction( "jsr silenc" );
+	WriteInstruction( "; SILENCE command" );
 }
 
 void CR_ClW( void )
 {
-	WriteInstruction( "jsr clw" );
+//	WriteInstruction( "jsr clw" );
+	WriteInstruction( "; CLW command" );
 }
 
 void CR_Palette( void )
 {
 //	CompileArgument();										/* palette register to write. */
-	WriteInstruction( "nop" );							/* register select. */
+//	WriteInstruction( "ld bc,64" );							/* register select. */
 //	WriteInstruction( "out (c),a" );
 //	CompileArgument();										/* palette data to write. */
 //	WriteInstruction( "ld bc,65" );							/* data select. */
 //	WriteInstruction( "out (c),a" );
+	WriteInstruction( "; PALETTE command" );							/* register select. */
 }
 
 void CR_GetBlock( void )
@@ -3859,8 +3869,8 @@ void CR_GetBlock( void )
 	unsigned short int nArg1 = NextKeyword();
 	unsigned short int nArg2;
 
-//	if ( nArg1 == INS_NUM )									/* first argument is numeric. */
-//	{
+	if ( nArg1 == INS_NUM )									/* first argument is numeric. */
+	{
 		nArg1 = GetNum( 8 );								/* store first argument. */
 		nArg2 = NextKeyword();								/* get second argument. */
 //		if ( nArg2 == INS_NUM )								/* second argument is numeric too. */
@@ -3873,18 +3883,18 @@ void CR_GetBlock( void )
 //		{
 			WriteInstruction( "lda #" );
 			WriteNumber( nArg1 );							/* first argument in c register. */
-			WriteInstruction( "sta z80_l" );
+			WriteInstruction( "sta dispx" );
 			CompileKnownArgument( nArg2 );					/* puts argument into accumulator. */
-			WriteInstruction( "sta z80_h" );					/* put that into b. */
+			WriteInstruction( "sta dispy" );					/* put that into b. */
 //		}
-//	}
-//	else
-//	{
+	}
+	else
+	{
 		CompileKnownArgument( nArg1 );						/* puts first argument into accumulator. */
 		WriteInstruction( "sta dispx" );						/* copy into c register. */
 		CompileArgument();									/* puts second argument into accumulator. */
 		WriteInstruction( "sta dispy" );						/* put that into b. */
-//	}
+	}
 
 //	WriteInstruction( "ld (dispx),hl" );					/* set the test coordinates. */
 	WriteInstruction( "jsr tstbl" );						/* get block there. */
@@ -3896,7 +3906,7 @@ void CR_Read( void )
 	char szInstruction[ 12 ];
 
 	cDataRequired = 1;										/* need to find data at the end. */
-	sprintf( szInstruction, "call read%02d", nEvent );
+	sprintf( szInstruction, "jsr read%02d", nEvent );
 	WriteInstruction( szInstruction );
 
 	nAnswerWantedHere = NextKeyword();
@@ -3931,9 +3941,9 @@ void CR_Data( void )
 				}
 				if ( nList == 0 && cData == 0 )
 				{
-					sprintf( szInstruction, "rptr%02d defw rdat%02d", nEvent, nEvent );
+					sprintf( szInstruction, "rptr%02d: .word rdat%02d", nEvent, nEvent );
 					WriteInstructionAndLabel( szInstruction );
-					sprintf( szInstruction, "rdat%02d .byte %d", nEvent, nValue );
+					sprintf( szInstruction, "rdat%02d: .byte %d", nEvent, nValue );
 					WriteInstructionAndLabel( szInstruction );
 				}
 				else
@@ -3968,37 +3978,45 @@ void CR_Data( void )
 		/* Now we set up a read routine. */
 		if ( SpriteEvent() )
 		{
-			sprintf( szInstruction, "read%02d ld l,(ix+15)", nEvent, nEvent );
+			sprintf( szInstruction, "read%02d: ldy #16", nEvent, nEvent );
 			WriteInstructionAndLabel( szInstruction );
-			WriteInstruction( "ld h,(ix+16)" );
+			WriteInstruction( "lda (z80_ix),y" );
+			WriteInstruction( "pha" );
+			WriteInstruction( "clc" );
+			WriteInstruction( "adc #1" );
+			WriteInstruction( "sta (z80_ix),y" );
+			WriteInstruction( "pla" );
+			WriteInstruction( "tay" );
 		}
 		else
 		{
-			sprintf( szInstruction, "read%02d ld hl,(rptr%02d)", nEvent, nEvent );
+			sprintf( szInstruction, "read%02d: ldy rptr%02d", nEvent, nEvent );
 			WriteInstructionAndLabel( szInstruction );
-		}
-		sprintf( szInstruction, "ld de,rdat%02d+%d", nEvent, nList );
-		WriteInstruction( szInstruction );
-		WriteInstruction( "scf" );
-		WriteInstruction( "ex de,hl" );
-		WriteInstruction( "sbc hl,de" );
-		WriteInstruction( "ex de,hl" );
-		WriteInstruction( "jr nc,$+5" );
-		sprintf( szInstruction, "ld hl,rdat%02d", nEvent, nEvent );
-		WriteInstruction( szInstruction );
-		WriteInstruction( "ld a,(hl)" );
-		WriteInstruction( "inc hl" );
-
-		if ( SpriteEvent() )
-		{
-			WriteInstruction( "ld (ix+15),l" );
-			WriteInstruction( "ld (ix+16),h" );
-		}
-		else
-		{
-			sprintf( szInstruction, "ld (rptr%02d),hl", nEvent );
+			sprintf( szInstruction, "inc rptr%02d", nEvent );
 			WriteInstruction( szInstruction );
 		}
+//		sprintf( szInstruction, "ld de,rdat%02d+%d", nEvent, nList );
+//		WriteInstruction( szInstruction );
+//		WriteInstruction( "scf" );
+//		WriteInstruction( "ex de,hl" );
+//		WriteInstruction( "sbc hl,de" );
+//		WriteInstruction( "ex de,hl" );
+//		WriteInstruction( "jr nc,$+5" );
+		sprintf( szInstruction, "lda rdat%02d,y", nEvent, nEvent );
+		WriteInstruction( szInstruction );
+//		WriteInstruction( "ld a,(hl)" );
+//		WriteInstruction( "inc hl" );
+
+//		if ( SpriteEvent() )
+//		{
+//			WriteInstruction( "ld (ix+15),l" );
+//			WriteInstruction( "ld (ix+16),h" );
+//		}
+//		else
+//		{
+//			sprintf( szInstruction, "ld (rptr%02d),hl", nEvent );
+//			WriteInstruction( szInstruction );
+//		}
 
 		WriteInstruction( "rts" );
 	}
@@ -4025,9 +4043,8 @@ void CR_Restore( void )
 	}
 	else
 	{
-		sprintf( szInstruction, "ld h,255", nEvent, nEvent );
-		WriteInstruction( szInstruction );
-		sprintf( szInstruction, "ld (rptr%02d),hl", nEvent );
+		WriteInstruction( "lda #255" );
+		sprintf( szInstruction, "sta rptr%02d", nEvent );
 		WriteInstruction( szInstruction );
 	}
 }
@@ -4119,28 +4136,33 @@ void CR_Plot( void )
 		nArg2 = NextKeyword();								/* get second argument. */
 		if ( nArg2 == INS_NUM )								/* second argument is numeric too. */
 		{
-			nArg2 = 256 * nArg1 + GetNum( 8 );
-			WriteInstruction( "ld hl," );
+			nArg2 = GetNum( 8 );
+			WriteInstruction( "lda #" );
+			WriteNumber( nArg1 );
+			WriteInstruction( "sta dispx" );
+			WriteInstruction( "lda #" );
 			WriteNumber( nArg2 );							/* pass both parameters as 16-bit argument. */
+			WriteInstruction( "sta dispy" );
 		}
 		else
 		{
-			WriteInstruction( "ld h," );
+			WriteInstruction( "lda #" );
 			WriteNumber( nArg1 );							/* first argument in c register. */
+			WriteInstruction( "sta dispx" );
 			CompileKnownArgument( nArg2 );					/* puts argument into accumulator. */
-			WriteInstruction( "ld l,a" );					/* put that into b. */
+			WriteInstruction( "sta dispy" );
 		}
 	}
 	else
 	{
 		CompileKnownArgument( nArg1 );						/* puts first argument into accumulator. */
-		WriteInstruction( "ld h,a" );						/* copy into c register. */
+		WriteInstruction( "sta dispx" );
 		CompileArgument();									/* puts second argument into accumulator. */
-		WriteInstruction( "ld l,a" );						/* put that into b. */
+		WriteInstruction( "sta dispy" );
 	}
 
-	WriteInstruction( "ld (dispx),hl" );					/* set the test coordinates. */
-	WriteInstruction( "call plot0" );						/* plot the pixel. */
+	WriteInstruction( "jsr plot0" );						/* plot the pixel. */
+	WriteText( "\n");
 }
 
 void CR_UndoSpriteMove( void )
@@ -4311,7 +4333,6 @@ void CR_DefineWindow( void )
 		{
 			nArg = GetNum( 8 );
 			nWinLeft = nArg;
-//			sprintf( szInstruction, "winlft .byte %d", nArg );
 			sprintf( szInstruction, "WINDOWLFT = %d", nArg );
 			WriteInstructionAndLabel( szInstruction );
 		}
@@ -4325,7 +4346,6 @@ void CR_DefineWindow( void )
 		{
 			nArg = GetNum( 8 );
 			nWinHeight = nArg;
-//			sprintf( szInstruction, "winhgt .byte %d", nArg );
 			sprintf( szInstruction, "WINDOWHGT = %d", nArg );
 			WriteInstructionAndLabel( szInstruction );
 		}
@@ -4339,7 +4359,6 @@ void CR_DefineWindow( void )
 		{
 			nArg = GetNum( 8 );
 			nWinWidth = nArg;
-//			sprintf( szInstruction, "winwid .byte %d", nArg );
 			sprintf( szInstruction, "WINDOWWID = %d ;", nArg );
 			WriteInstructionAndLabel( szInstruction );
 		}
@@ -4935,6 +4954,7 @@ void CR_PamB( short int nNum )
 	if ( nNum >= FIRST_VARIABLE )							/* compare accumulator with global variable. */
 	{
 		sprintf( cVar, "cmp %s", cVariables[ nNum - FIRST_VARIABLE ] );
+		WriteInstruction( cVar );
 	}
 	else													/* compare accumulator with sprite parameter. */
 	{
@@ -4980,25 +5000,25 @@ short int Joystick( short int nArg )
 {
 	short int nArg2;
 
-	switch( nArg )										/* conversion to Kempston bit order. */
-	{
-		case 0:
-			nArg2 = 0;
-			break;
-		case 1:
-			nArg2 = 1;
-			break;
-		case 2:
-			nArg2 = 2;
-			break;
-		case 3:
-			nArg2 = 3;
-			break;
-		default:
+//	switch( nArg )										/* conversion to Kempston bit order. */
+//	{
+//		case 0:
+//			nArg2 = 0;
+//			break;
+//		case 1:
+//			nArg2 = 1;
+//			break;
+//		case 2:
+//			nArg2 = 2;
+//			break;
+//		case 3:
+//			nArg2 = 3;
+//			break;
+//		default:
 			nArg2 = nArg;
-			break;
-	}
-
+//			break;
+//	}
+//
 	return ( nArg2 );
 }
 
@@ -5055,28 +5075,28 @@ void WriteJPNZ( void )
 			WriteInstruction( "jmp xxxxxx" );
 			break;
 		case OPE_GRTEQU:
-			WriteInstruction( "jr z,$+5" );					/* test succeeded, skip jp nc instruction */
-			WriteInstruction( "jp nc,xxxxxx" );
+			WriteInstruction( "beq *+4" );					/* test succeeded, skip jp nc instruction */
+			WriteInstruction( "bcs xxxxxx" );
 			break;
 		case OPE_GRT:
-			WriteInstruction( "bcc *+5 ; OPE_GRT" );
-			WriteInstruction( "jmp xxxxxx" );
-			break;
-		case OPE_LESEQU:
 			WriteInstruction( "bcc *+5" );
 			WriteInstruction( "jmp xxxxxx" );
 			break;
-		case OPE_LES:
-			WriteInstruction( "bcs *+5 ; OPE_LESS");
+		case OPE_LESEQU:
+			WriteInstruction( "bcs *+5" );
 			WriteInstruction( "jmp xxxxxx" );
-			if ( nLastCondition == INS_IF )
-			{
-				nIfBuff[ nNumIfs ][ 1 ] = nCurrent - 6;		/* minus 6 for label after conditional jump. */
-			}
-			else
-			{
-				nWhileBuff[ nNumWhiles ][ 1 ] = nCurrent - 6;
-			}
+			break;
+		case OPE_LES:
+			WriteInstruction( "bcc *+4");
+//			WriteInstruction( "jmp xxxxxx" );
+//			if ( nLastCondition == INS_IF )
+//			{
+//				nIfBuff[ nNumIfs ][ 1 ] = nCurrent - 6;		/* minus 6 for label after conditional jump. */
+//			}
+//			else
+//			{
+//				nWhileBuff[ nNumWhiles ][ 1 ] = nCurrent - 6;
+//			}
 			WriteInstruction( "bne *+5" );
 			WriteInstruction( "jmp xxxxxx" );
 			break;

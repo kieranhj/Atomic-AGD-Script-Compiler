@@ -189,6 +189,7 @@ dbox5:
 	sta z80_b
 mod2:
 	jsr always		; item in player"s possession?
+	cmp #255
 	bne dbox6		; not in inventory, skip this line.
 	inc z80_d		; add to tally.
 dbox6:
@@ -271,6 +272,7 @@ dbox2:
 	sta z80_a
 mod0:
 	jsr always		; check inventory for display.
+	cmp #255
 	beq :+			
 	jmp dbox13		; not in inventory, skip this line.
 :
@@ -429,9 +431,9 @@ dbox13:
 :
 	jmp dbox13
 dbox15:
-;	pla			; pop message pointer from the stack.
+	lda TmpAddr			; pop message pointer from the stack.
 	sta z80_h
-;	pla
+	lda TmpAddr+1
 	sta z80_l
 	rts
 
@@ -470,27 +472,39 @@ dbar0:
 ;------------------------------------------------------
 
 invdis:
+	lda z80_l
+	pha
+	lda z80_h
+	pha
 	lda combyt		; object number.
 	inc combyt		; ready for next one.
 	jsr gotob		; check if we have object.
+	tay
+	pla
+	sta z80_h
+	pla
+	sta z80_l
+	tya
 	rts
 
 ;------------------------------------------------------
 ; Find option selected.
 ;------------------------------------------------------
 
+tmp = $88
+
 fopt:
 	lda dispy
 	sec
 	sbc btop
-	sta z80_b		; option selected in b register.
-	inc z80_b
+	sta tmp+2		; option selected in b register.
+	inc tmp+2
 
 	lda #0
 	sta combyt		; object number.
 fopt0:
 	jsr fobj		; find next object in inventory.
-	dec z80_b
+	dec tmp+2
 	beq :+
 	jmp fopt0		; repeat for relevant steps down the list.
 :
@@ -506,7 +520,8 @@ fobj:
 	rts
 :
 	jsr gotob		; do we have this item?
-	bne :+			; yes, it"s on the list.
+	cmp #255
+	beq :+			; yes, it"s on the list.
 	rts
 :
 	jmp fobj		; repeat until we find next item in pockets.
@@ -919,7 +934,7 @@ redraw:
 	jsr shwob		; draw objects.
 numsp0:
 	lda #NUMSPR		; sprites to draw.
-	sta z80_b
+	sta tmp
 
 	lda #<sprtab		; sprite table.
 	sta z80_x
@@ -945,7 +960,7 @@ redrw1:
 	bcc :+
 	inc z80_i
 :
-	dec z80_b		; repeat for remaining sprites.
+	dec tmp			; repeat for remaining sprites.
 	bne redrw0
 rpblc1:
 ;	jsr dshrp		; redraw shrapnel.
@@ -3011,47 +3026,38 @@ evrs:
 
 num2ch:
 	sta z80_d
+
 	ldx #100
 	stx z80_e
-	lda #32
 	jsr numdg
 
 	ldx #10
 	stx z80_e
 	jsr numdg
 
-	ora #16
 	ldx #1
 	stx z80_e
 numdg:
-	and #48
+	lda #48
 	sta z80_a
 numdg1:
+	lda z80_d
+	cmp z80_e
+	bcc numdg0
 	sec
 	lda z80_d
 	sbc z80_e
 	sta z80_d
-	bcc numdg0
 	inc z80_a
-	lda z80_a
-	ora #16
 	jmp numdg1
 numdg0:
-	clc
-	lda z80_d
-	adc z80_e
-	sta z80_d
-	lda z80_a
-	cmp #32
-	bne :+
-	rts
-:
 	ldy #0
+	lda z80_a
 	sta (z80_bc),y
 	inc z80_c
-	bne :+
+	bne numdg2
 	inc z80_b
-:
+numdg2:
 	rts
 
 ;---------------------------------------------------------
@@ -4005,16 +4011,17 @@ remob:
 
 getob:
 	cmp numob 			; number of objects in game.
-	bcs :+
+	bcc :+
 	rts				; yes, can"t get non-existent item.
 :
 	jsr gotob 			; check if we already have it.
+	cmp #255
 	bne :+
 	rts				; we already do.
 :
-	lda scno 			; current screen.
 	ldy #32
-	cmp (z80_hl),y			; is it on this screen?
+	lda (z80_hl),y			; is it on this screen?
+	cmp scno 			; current screen.
 	bne getob0			; not on screen, so nothing to delete.
 
 	lda #255
@@ -4049,7 +4056,7 @@ gotob:
 :
 	jsr findob		 	; find the object.
 gotob1:
-	cmp #255 			; in pockets?
+;	cmp #255 			; in pockets?
 	rts
 
 gotob0:
@@ -4095,13 +4102,14 @@ drpob:
 	rts				; yes, nothing to do.
 :
 	ldy #32
+	lda scno
 	sta (z80_hl),y			; bring onto screen.
+	lda dispy			; sprite x coordinate.
 	iny 
-	lda (z80_hl),y			; point to object y.
-	sta dispy			; sprite x coordinate.
+	sta (z80_hl),y			; point to object y.
+	lda dispx 			; sprite y coordinate.
 	iny
-	lda (z80_hl),y 			; point to object x.
-	sta dispx 			; sprite y coordinate.
+	sta (z80_hl),y 			; point to object x.
 	jmp dobj			; draw the object sprite.
 
 ;-----------------------------------------------
@@ -4137,7 +4145,7 @@ skobj0:
 	rts
 
 skobj1:
-	iny				; point to y coordinate.
+	ldy #33				; point to y coordinate.
 	lda (z80_hl),y			; point to y coordinate.
 	sec
 	ldy #8
@@ -4148,8 +4156,7 @@ skobj1:
 	bcc :+
 	jmp skobj2		 	; no, ignore object.
 :
-	; 22.04.xx inc hl 
-	iny				; point to x coordinate now.
+	ldy #34				; point to x coordinate now.
 	lda (z80_hl),y 			; get coordinate.
 	sec
 	ldy #9
@@ -4158,7 +4165,7 @@ skobj1:
 	adc #15
 	cmp #31				; within range?
 	bcc :+
-	jmp skobj3			; no, ignore object.
+	jmp skobj2			; no, ignore object.
 :
 	pla				; remove return address from stack.
 	pla
@@ -4166,8 +4173,6 @@ skobj1:
 	lda numob 			; objects in game.
 	sec
 	sbc z80_b
-	rts			 	; accumulator now points to object.
-skobj3:
 skobj2:
 	rts
 
@@ -4204,7 +4209,7 @@ spaw0:
 spaw1:
 	lda z80_i			; address of original sprite.
 	pha
-	sta z80_x
+	lda z80_x
 	pha
 
 	lda z80_l			; store spawned sprite address.
@@ -4230,15 +4235,15 @@ spaw1:
 	ldy #7
 	sta (z80_hl),y			; copy
 
-	ldy #9
-	lda (z80_ix),y 			; x coordinate.
+	ldy #8
+	lda (z80_ix),y 			; y coordinate.
 	ldy #3
 	sta (z80_hl),y			; set sprite coordinate.
 	ldy #8
 	sta (z80_hl),y			; copy
 
-	ldy #8
-	lda (z80_ix),y 			; y coordinate.
+	ldy #9
+	lda (z80_ix),y 			; x coordinate.
 	ldy #4
 	sta (z80_hl),y			; set sprite coordinate.
 	ldy #9
@@ -4731,6 +4736,7 @@ panp0:
 	dex	 			; repeat for 8 pixel rows.
 	bpl panp0
 	inc dispx 			; move along one.
+	inc charx
 	rts
 
 ;----------------------------------------------------
@@ -4963,128 +4969,67 @@ flbyt1:
 combyt:	.byte 0				; byte type compressed.
 comcnt:	.byte 0				; compression counter.
 
+;------------------------------------------
 ; Ladder down check.
+;------------------------------------------
 
 laddd:
-	; 29.03.01 ld a, (ix+8) 	; y coordinate.
-	ldy #8
-	lda (z80_ix),y
-	sta z80_a
-
-	; 02.05.xx and 254 	; make it even.
-	lda z80_a
-	and #254
-
-	; 29.01.03 ld (ix+8), a 	; reset it.
-	lda z80_a
-	ldy #8
-	sta (z80_ix),y
-
-	; 29.03.01 ld h, (ix+9) 	; x coordinate.
 	ldy #9
-	lda (z80_ix),y
-	sta z80_h
+	lda (z80_ix),y			; x coordinate.
+	sta dispx
 
+	ldy #8
+	lda (z80_ix),y		 	; y coordinate.
+	and #254			; make it even.
+	sta (z80_ix),y 			; reset it.
 numsp5:
-	; 01.03.05 add a, 16 	; look down 16 pixels.
-	lda #(16)
-	clc
-	adc z80_a
-	sta z80_a
-
-	; 29.03.03 ld l, a 	; coords in hl.
-	lda z80_a
-	sta z80_l
-
-	; 28.00.xx jr laddv 	
+	clc 				; look down 16 pixels.
+	adc #16
+	sta dispy			; coords in hl.
 	jmp laddv
 
-
+;------------------------------------------
 ; Ladder up check.
+;------------------------------------------
 
 laddu:
-	; 29.03.01 ld a, (ix+8) 	; y coordinate.
-	ldy #8
-	lda (z80_ix),y
-	sta z80_a
-
-	; 02.05.xx and 254 	; make it even.
-	lda z80_a
-	and #254
-
-	; 29.01.03 ld (ix+8), a 	; reset it.
-	lda z80_a
-	ldy #8
-	sta (z80_ix),y
-
-	; 29.03.01 ld h, (ix+9) 	; x coordinate.
 	ldy #9
-	lda (z80_ix),y
-	sta z80_h
-
-numsp6:
-	; 01.03.05 add a, 14 	; look 2 pixels above feet.
-	lda #(14)
-	clc
-	adc z80_a
-	sta z80_a
-
-	; 29.03.03 ld l, a 	; coords in hl.
-	lda z80_a
-	sta z80_l
-
-laddv:
-	; 29.02.04 ld (dispx), hl 	; set up test coordinates.
-	lda z80_l
+	lda (z80_ix),y		 	; x coordinate.
 	sta dispx
-	lda z80_h
-	sta dispx+1
 
-	; 04.00.xx call tstbl 	; get map address.
-	jsr tstbl
-
-	; 04.00.xx call ldchk 	; standard ladder check.
-	jsr ldchk
-
-	; 43.06.xx rts nz 	; no way through.
+	ldy #8
+	lda (z80_ix),y		 	; y coordinate.
+	and #254 			; make it even.
+	sta (z80_ix),y			; reset it.
+numsp6:
+	clc 				; look 2 pixels above feet.
+	adc #14
+	sta dispy			; coords in hl.
+laddv:
+	jsr tstbl 			; get map address.
+	jsr ldchk 			; standard ladder check.
 	beq :+
-	rts
+	rts 				; no way through.
 :
-	; 22.04.xx inc hl 	; look right one cell.
-	inc z80_l
+	inc bufaddr 			; look right one cell.
 	bne :+
-	inc z80_h
+	inc bufaddr+1
 :
-	; 04.00.xx call ldchk 	; do the check.
-	jsr ldchk
-
-	; 43.06.xx rts nz 	; impassable.
+	jsr ldchk 			; do the check.
 	beq :+
-	rts
+	rts 				; impassable.
 :
-	; 29.03.02 ld a, (dispy) 	; y coordinate.
-	lda dispy
-	sta z80_a
-
-	; 02.05.xx and 7 	; position straddling block cells.
-	lda z80_a
-	and #7
-
-	; 43.06.xx rts z 	; no more checks needed.
+	lda dispx 			; y coordinate.
+	and #7 				; position straddling block cells.
 	bne :+
-	rts
+	rts 				; no more checks needed.
 :
-	; 22.04.xx inc hl 	; look to third cell.
-	inc z80_l
+	inc bufaddr 			; look to third cell.
 	bne :+
-	inc z80_h
+	inc bufaddr+1
 :
-	; 04.00.xx call ldchk 	; do the check.
-	jsr ldchk
-
-	; 43.xx.xx rts  	; return with zero flag set accordingly.
-	rts
-
+	jsr ldchk 			; do the check.
+	rts  				; return with zero flag set accordingly.
 
 ;---------------------------------------------------------
 ; Can go up check.
@@ -5255,11 +5200,13 @@ lrchk:
 
 	cmp #FODDER			; fodder has to be dug.
 	beq lrchkx			; not passable.
+	lda #0
+	rts
 
 ; Called by mmenu
 
 always:
-	lda #0			 	; report it as okay.
+	lda #255		 	; report it as okay.
 	rts
 
 lrchkx:
@@ -5297,21 +5244,21 @@ plchkx:
 	beq lrchkx			; on platform, deny movement.
 	jmp plchk0
 
+;--------------------------------------------------------------
 ; Check ladder is available.
+;--------------------------------------------------------------
 
 ldchk:
-	; 29.03.01 ld a, (hl) 	; fetch cell.
 	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 06.00.xx cp LADDER 	; is it a ladder?
-	lda z80_a
-	cmp LADDER
-
-	; 43.xx.xx rts  	; return with zero flag set accordingly.
+	lda (bufaddr),y 		; fetch cell.
+	sta $9b00
+	cmp #LADDER 			; is it a ladder?
+	beq ldchk1
+	lda #1
+	rts  				; return with zero flag set accordingly.
+ldchk1:
+	lda #0
 	rts
-
 
 ;--------------------------------------------------------------
 ; Touched deadly block check.
@@ -5935,6 +5882,7 @@ getwd0:
 ;-----------------------------------------------------------
 
 bsort:
+	rts
 	ldx #NUMSPR - 1			; sprites to swap.
 
 	lda #<sprtab 			; sprite table.
@@ -6377,12 +6325,6 @@ ssprib:
 ;-----------------------------------------------------------------
 
 sspric:
-	lda dispx
-	and #6
-	cmp #2
-	bne :+
-	nop
-:
 	jsr gsprad 			; get old sprite address.
 	jsr exx  			; store addresses.
 	jsr gspran 			; get new sprite addresses.
@@ -6573,45 +6515,30 @@ anims0:
 	sta (z80_ix),y			; new frame.
 	rts
 
+;--------------------------------------------------------------
+; Animate back
+;--------------------------------------------------------------
+
 animbk:
-	; 29.03.01 ld a, (ix+6) 	; sprite image.
 	ldy #6
-	lda (z80_ix),y
-	sta z80_a
+	lda (z80_ix),y			; sprite image.
+	jsr gfrm			; get frame data.
 
-	; 04.00.xx call gfrm 	; get frame data.
-	jsr gfrm
-
-	; 22.04.xx inc hl 	; point to frames.
-	inc z80_l
+	inc z80_l 			; point to frames.
 	bne :+
 	inc z80_h
 :
-	; 29.03.01 ld a, (ix+7) 	; sprite frame.
 	ldy #7
-	lda (z80_ix),y
-	sta z80_a
-
-	; 02.03.xx and a 	; first one?
-	lda z80_a
-	and z80_a
-
-	; 28.06.00 jr nz, rtanb0 	; yes, start at end.
+	lda (z80_ix),y 			; sprite frame.
 	beq :+
-	jmp rtanb0
+	jmp rtanb0 			; yes, start at end.
 :
-	; 29.03.01 ld a, (hl) 	; last sprite.
 	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
+	lda (z80_hl),y 			; last sprite.
 rtanb0:
-	; 13.03.xx dec a 	; next one along.
-	dec z80_a
-
-	; 28.00.xx jr anims0 	; set new frame.
-	jmp anims0
-
+	sec
+	sbc #1				; next one along.
+	jmp anims0			; set new frame.
 
 ;--------------------------------------------------------------
 ; Check for collision with other sprite, strict enforcement.
@@ -6970,7 +6897,6 @@ ifall:
 	ldy #9
 	lda (z80_ix),y			; y coordinate.
 	sta dispx
-	sta $9b00
 numsp7:
 	ldy #8
 	lda (z80_ix),y			; look x coordinate.

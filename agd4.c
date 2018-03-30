@@ -673,7 +673,7 @@ unsigned const char *keywrd =
 	"LEFT."				// left constant (keys).
 	"DOWN."				// down constant (keys).
 	"UP."				// up constant (keys).
-	"FIRE."				// fire constant (keys).
+	"FIRE1."				// fire constant (keys).
 	"FIRE2."			// fire2 constant (keys).
 	"FIRE3."			// fire3 constant (keys).
 	"OPTION1."			// option constant (keys).
@@ -3054,8 +3054,8 @@ void CR_Key( void )
 			nArg2 = Joystick( nArg );
 			nArg2 = nArg;
 			WriteInstruction( "lda joyval" );
-			WriteInstruction( "and #" );
-			WriteNumber( 1 << nArg2 );
+		sprintf( szInstruction, "and #%d", 1 << nArg2 );	/* get key from table. */
+			WriteInstruction( szInstruction );
 			WriteInstruction( "beq :+" );
 			WriteInstruction( "jmp       " );
 			nReadingControls++;									/* set flag to read joystick in WHILE loop. */
@@ -3149,6 +3149,10 @@ void CR_AnimBack( void )
 
 void CR_PutBlock( void )
 {
+	WriteInstruction( "lda charx" );
+	WriteInstruction( "sta dispx" );
+	WriteInstruction( "lda chary" );
+	WriteInstruction( "sta dispy" );
 	CompileArgument();
 	WriteInstruction( "jsr pattr" );
 }
@@ -3571,12 +3575,14 @@ void CR_Chr( void )
 void CR_Menu( void )
 {
 	CompileArgument();
+	WriteInstruction( "tax" );
 	WriteInstruction( "jsr mmenu" );
 }
 
 void CR_Inventory( void )
 {
 	CompileArgument();
+	WriteInstruction( "tax" );
 	WriteInstruction( "jsr minve" );
 }
 
@@ -3695,9 +3701,9 @@ void CR_Put( void )
 	CompileArgument();
 	WriteInstruction( "pha; CR_PUT" );							/* remember object number. */
 	CompileArgument();										/* put object number in accumulator. */
-	WriteInstruction( "sta dispy" );							/* remember object number. */
-	CompileArgument();
 	WriteInstruction( "sta dispx" );							/* remember object number. */
+	CompileArgument();
+	WriteInstruction( "sta dispy" );							/* remember object number. */
 	WriteInstruction( "pla" );
 	WriteInstruction( "jsr drpob" );
 }
@@ -3941,7 +3947,7 @@ void CR_Data( void )
 				}
 				if ( nList == 0 && cData == 0 )
 				{
-					sprintf( szInstruction, "rptr%02d: .word rdat%02d", nEvent, nEvent );
+					sprintf( szInstruction, "rptr%02d: .byte 0", nEvent );
 					WriteInstructionAndLabel( szInstruction );
 					sprintf( szInstruction, "rdat%02d: .byte %d", nEvent, nValue );
 					WriteInstructionAndLabel( szInstruction );

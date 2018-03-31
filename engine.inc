@@ -6727,7 +6727,7 @@ tstsc:
 	clc
 	adc #MAPWID 			; add width in case we"re negative.
 	tax 				; add displacement to map data.
-	lda mapdat-MAPWID-1,x 		; find room number there.
+	lda mapdat-MAPWID,x 		; find room number there.
 	rts
 
 ;--------------------------
@@ -6759,12 +6759,12 @@ scrr:
 scru:
 	lda roomtb 			; room table pointer.
 	sec
-	sbc MAPWID 			; room up.
+	sbc #MAPWID 			; room up.
 	jmp scrl0
 scrd:
 	lda roomtb 			; room table pointer.
 	clc
-	adc MAPWID 			; room down.
+	adc #MAPWID 			; room down.
 	jmp scrl0
 
 ;-----------------------------------------
@@ -7019,7 +7019,8 @@ sprls0:
 ;----------------------------------------------------
 
 nspr:
-	ldx #NUMSPR			; sprite slots in table.
+	lda #NUMSPR			; sprite slots in table.
+	sta z80_b
 	lda #<sprtab 			; sprite table.
 	sta z80_x
 	lda #>sprtab
@@ -7042,7 +7043,7 @@ nspr0:
 	bcc :+
 	inc z80_i
 :
-	dex	 			; one less space in the table.
+	dec z80_b	 			; one less space in the table.
 	bne nspr0
 	rts
 nspr1:
@@ -7057,7 +7058,7 @@ nspr1:
 	bcc :+
 	inc z80_i
 :
-	dex	 			; one less to do.
+	dec z80_b	 			; one less to do.
 	bne nspr2
 	rts
 nspr2:
@@ -7074,7 +7075,7 @@ nspr2:
 	bcc :+
 	inc z80_i
 :
-	dex	 			; one less space in table.
+	dec z80_b	 			; one less space in table.
 	bne nspr2
 	rts
 
@@ -7149,6 +7150,7 @@ kspr2:
 	bne :+
 	rts 				; yes, no more to do.
 :
+	cmp #0
 	bne kspr1 			; no, add to table as normal.
 
 	clc 				; next sprite.

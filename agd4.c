@@ -3090,11 +3090,17 @@ void CR_DefineKey( void )
 	char szInstruction[ 15 ];
 	unsigned short int nNum = NumberOnly();
 
+	sprintf( szInstruction, "lda #%d", Joystick( nNum ) );
+	WriteInstruction( szInstruction );
+	WriteInstruction( "tax" );
+	WriteInstruction( "jsr kget" );
+	WriteInstruction( "sta keys,x" );
+	
 //	WriteInstruction( "call 654" );
 //	WriteInstruction( "inc e" );
 //	WriteInstruction( "jr z,$-4" );
-	sprintf( szInstruction, "; DEFINEKEY %d command", Joystick( nNum ) );
-	WriteInstruction( szInstruction );
+//	sprintf( szInstruction, "; DEFINEKEY %d command", Joystick( nNum ) );
+//	WriteInstruction( szInstruction );
 //	WriteInstruction( "dec e" );
 //	WriteInstruction( "ld (hl),e" );
 }

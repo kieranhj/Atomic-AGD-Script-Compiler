@@ -377,7 +377,9 @@ dboxf:
 	lda #32			; space character.
 	jsr pchr		; display character.
 	dec z80_b
-	bne dboxf		; repeat for remaining chars on line.
+	beq :+
+	jmp dboxf		; repeat for remaining chars on line.
+:
 	rts
 dbox1:
 	inc z80_l		; skip character.
@@ -552,8 +554,9 @@ fopt:
 fopt0:
 	jsr fobj		; find next object in inventory.
 	dec tmp+2
-	bne fopt0		; repeat for relevant steps down the list.
-
+	beq :+
+	jmp fopt0		; repeat for relevant steps down the list.
+:
 	lda combyt		; get option.
 	sta varopt		; store the option.
 	dec varopt		; one less, due to where we increment combyt.
@@ -567,8 +570,10 @@ fobj:
 :
 	jsr gotob		; do we have this item?
 	cmp #255
-	beq fobj		; yes, it's on the list.
+	beq :+
 	rts
+:
+	jmp fobj		; yes, it's on the list.
 
 bwid:	.byte 0              ; box/menu width.
 blen:	.byte 0              ; box/menu height.
@@ -618,11 +623,12 @@ delay1:
 
 xspr:
 	lda #255		; clear byte.
-	ldx #SPRBUF-1		; length of table.
+	ldx #0			; length of table.
 xspr0:
 	sta sprtab,x		; sprite table.
-	dex			; move to next byte.
-	bpl xspr0		; repeat for rest of table.
+	inx			; move to next byte.
+	cpx #SPRBUF
+	bne xspr0		; repeat for rest of table.
 	rts
 
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -979,7 +985,7 @@ redrw1:
 	dec tmp			; repeat for remaining sprites.
 	bne redrw0
 rpblc1:
-	jsr dshrp		; redraw shrapnel.
+;	jsr dshrp		; redraw shrapnel.
 
 	pla			; retrieve sprite pointer.
 	sta z80_x
@@ -2816,7 +2822,7 @@ mloop:
 	sta z80_i
 	jsr dspr 		; display even sprites.
 
-	jsr plsnd 		; play sounds.
+;	jsr plsnd 		; play sounds.
 	jsr vsync 		; synchronise with display.
 
 	lda #<(sprtab+TABSIZ) 	; address of first odd sprite.
@@ -2890,8 +2896,9 @@ pdead:
 evdie:
 	jsr evnt16 			; death subroutine.
 	lda numlif			; number of lives.
-	beq evfail
+	beq :+
 	jmp rstrt 			; restart game.
+:
 evfail:
 	jsr evnt17 			; failure event.
 
@@ -4242,8 +4249,10 @@ checkx:
 	bcs :+
 	rts			; no, it's okay.
 :
-	pla			; remove return address from stack.
+	pla					; remove return address from stack.
+	sta z80_l
 	pla
+	sta z80_h
 	rts
 
 ;-----------------------------------------------
@@ -4666,8 +4675,8 @@ sprite:
 	sta sprit1+2
 	sta sprit2+2
 
-	ldy #0
 	ldx #0			; pixel height.
+	ldy #0
 sprit1:
 	lda objdta,x		; fetch first byte.
 	sta spr
@@ -5027,6 +5036,7 @@ cangr:
 	adc #16			; look right 16 pixels.
 	sta dispx		; coords in dispx,dispy.
 cangh:
+cangh2:
 	lda #3			; default rows to write.
 	sta z80_b
 	lda dispy		; y position.
@@ -5075,10 +5085,6 @@ lrchk:
 	lda #0
 	rts
 
-lrchkx:
-	lda #1 			; reset all bits.
-	rts
-
 ;--------------------------------------------------------------
 ; Called by mmenu
 ;--------------------------------------------------------------
@@ -5086,6 +5092,11 @@ lrchkx:
 always:
 	lda #255		; report it as okay.
 	rts
+
+lrchkx:
+	lda #1 			; reset all bits.
+	rts
+
 
 ;--------------------------------------------------------------
 ; Check platform or solid item is not in way.
@@ -5653,7 +5664,7 @@ bchar0:
 	ldy #0
 	lda (z80_de),y 		; get a bit of the font.
 
-	eor TxtInvert		; Invert
+	eor #TxtInvert		; Invert
 
 	sta (scraddr),y
 	pha
@@ -5865,49 +5876,44 @@ swspr0:
 
 ;----------------------------------------------------
 ; Process sprites.
-;
-; ++++++++++++++CHECK CONTROLE++++++++++++++++++++++
-; global:	-
-; local:	x,y,ix,hl,ogptr
-; calls:	-
 ;----------------------------------------------------
 
 pspr:
-	lda #NUMSPR			; sprites to process.
+	lda #NUMSPR		; sprites to process.
 	sta sprptr
 
-	lda #<sprtab 			; sprite table.
+	lda #<sprtab 		; sprite table.
 	sta z80_x
 	lda #>sprtab
 	sta z80_i
 pspr1:
 	ldy #0
-	lda (z80_ix),y		 	; fetch sprite type.
-	cmp #9 				; within range of sprite types?
+	lda (z80_ix),y		; fetch sprite type.
+	cmp #9 			; within range of sprite types?
 	bcs :+
-	jsr pspr2 			; yes, process this one.
+	jsr pspr2 		; yes, process this one.
 :
 	clc
 	lda z80_x
-	adc #TABSIZ 			; distance to next odd/even entry.
+	adc #TABSIZ 		; distance to next odd/even entry.
 	sta z80_x
 	bcc :+
-	inc z80_i		 	; next sprite.
+	inc z80_i		; next sprite.
 :
-	dec sprptr 			; repeat for remaining sprites.
+	dec sprptr 		; repeat for remaining sprites.
 	bne pspr1
 	rts
 
 sprptr:	.byte 0
 
 pspr2:
-	lda z80_x 			; store original sprite pointer.
+	lda z80_x 		; store original sprite pointer.
 	sta ogptr
 	lda z80_i
 	sta ogptr+1
-	jsr pspr3		 	; do the routine.
+	jsr pspr3		; do the routine.
 rtorg:
-	lda ogptr 			; restore original pointer to sprite.
+	lda ogptr 		; restore original pointer to sprite.
 	sta z80_x
 	lda ogptr+1
 	sta z80_i
@@ -5915,13 +5921,13 @@ rtorg0:
 	rts
 
 pspr3:
-	lda #<evtyp0		 	; sprite type events list.
+	lda #<evtyp0		; sprite type events list.
 	sta z80_l
 	lda #>evtyp0
 	sta z80_h
 pspr4:
 	lda (z80_ix),y
-	asl a			 	; double accumulator.
+	asl a			; double accumulator.
 	clc
 	adc z80_l
 	sta z80_l
@@ -5929,17 +5935,17 @@ pspr4:
 	inc z80_h
 :
 	lda (z80_hl),y
-	sta z80_e 			; copy to de.
+	sta z80_e 		; copy to de.
 	pha
 
-	inc z80_l 			; next byte of address.
+	inc z80_l 		; next byte of address.
 	bne :+
 	inc z80_h
 :
-	lda (z80_hl),y 			; address high.
+	lda (z80_hl),y 		; address high.
 	sta z80_d
 
-	pha	 			; swap address into hl.
+	pha	 		; swap address into hl.
 	lda z80_h
 	sta z80_d
 	pla
@@ -5949,9 +5955,9 @@ pspr4:
 	lda z80_l
 	sta z80_e
 	
-	jmp (z80_hl) 			; go there.
+	jmp (z80_hl) 		; go there.
 
-ogptr:	.word 0				; original sprite pointer.
+ogptr:	.word 0			; original sprite pointer.
 
 ; Address of each sprite type's routine.
 
@@ -5969,99 +5975,94 @@ evtyp8:	.word evnt08
 ; Display sprites.
 ;
 ; Input:
-;  ix 		= sprite table
-; Output:
-;
-; global:	ix
-; local:	y,sprcnt
-; calls:	sspria,ssprib,sspric
+;  IX = sprite table
 ;--------------------------------------------------------------
 
 dspr:
-	lda #(NUMSPR/2)			; number of sprites to display.
+	lda #(NUMSPR/2)		; number of sprites to display.
 	sta sprcnt
 dspr0:
 	ldy #0
-	lda (z80_ix),y 			; get sprite type.
-	cmp #255 			; is it enabled?
-	bne dspr1 			; yes, it needs deleting.
+	lda (z80_ix),y 		; get sprite type.
+	cmp #255 		; is it enabled?
+	bne dspr1 		; yes, it needs deleting.
 dspr5:
 	ldy #5
-	lda (z80_ix),y 			; new type.
-	cmp #255			; is it enabled?
-	bne dspr3 			; yes, it needs drawing.
+	lda (z80_ix),y 		; new type.
+	cmp #255		; is it enabled?
+	bne dspr3 		; yes, it needs drawing.
 dspr2:
 	ldy #5
-	lda (z80_ix),y 			; copy new type.
+	lda (z80_ix),y 		; copy new type.
 	ldy #0
 	sta (z80_ix),y
 	ldy #6
-	lda (z80_ix),y 			; copy new image number.
+	lda (z80_ix),y 		; copy new image number.
 	ldy #1
 	sta (z80_ix),y
 	ldy #7
-	lda (z80_ix),y 			; copy new frame.
+	lda (z80_ix),y 		; copy new frame.
 	ldy #2
 	sta (z80_ix),y
 	ldy #8
-	lda (z80_ix),y 			; copy new x.
+	lda (z80_ix),y 		; copy new y.
 	ldy #3
 	sta (z80_ix),y
 	ldy #9
-	lda (z80_ix),y 			; copy new y.
+	lda (z80_ix),y 		; copy new x.
 	ldy #4
 	sta (z80_ix),y
 
 	clc
 	lda z80_x
-	adc #(TABSIZ*2)			; distance to next odd/even entry.
+	adc #(TABSIZ*2)		; distance to next odd/even entry.
 	sta z80_x
 	lda z80_i
 	adc #0
-	sta z80_i 			; next sprite.
+	sta z80_i 		; next sprite.
 	dec sprcnt
-	bne dspr0		 	; repeat for remaining sprites.
+	bne dspr0		; repeat for remaining sprites.
 	rts
 dspr1:
 	ldy #5
-	lda (z80_ix),y 			; type of new sprite.
-	cmp #255		 	; is this enabled?
-	bne dspr4 			; yes, display both.
+	lda (z80_ix),y 		; type of new sprite.
+	cmp #255		; is this enabled?
+	bne dspr4 		; yes, display both.
 dspr6:
-	jsr sspria 			; show single sprite.
+	jsr sspria 		; show single sprite.
 	jmp dspr2
 
 ; Displaying two sprites.  Don't bother redrawing if nothing has changed.
 
 dspr4:
 	ldy #4
-	lda (z80_ix),y		 	; old y.
+	lda (z80_ix),y		; old x.
 	ldy #9
-	cmp (z80_ix),y 			; compare with new value.
-	bne dspr7 			; they differ, need to redraw.
+	cmp (z80_ix),y 		; compare with new value.
+	bne dspr7 		; they differ, need to redraw.
 
 	ldy #3
-	lda (z80_ix),y		 	; old x.
+	lda (z80_ix),y		; old y.
 	ldy #8
-	cmp (z80_ix),y 			; compare against new value.
-	bne dspr7		 	; they differ, need to redraw.
+	cmp (z80_ix),y 		; compare against new value.
+	bne dspr7		; they differ, need to redraw.
 
 	ldy #2
-	lda (z80_ix),y 			; old frame.
+	lda (z80_ix),y 		; old frame.
 	ldy #7
-	cmp (z80_ix),y 			; compare against new value.
-	jmp dspr7 			; they differ, need to redraw.
+	cmp (z80_ix),y 		; compare against new value.
+	jmp dspr7 		; they differ, need to redraw.
 
 	ldy #1
-	lda (z80_ix),y 			; old image.
+	lda (z80_ix),y 		; old image.
 	ldy #6
-	cmp (z80_ix),y 			; compare against new value.
-	beq dspr2		 	; everything is the same, don't redraw.
+	cmp (z80_ix),y 		; compare against new value.
+	beq dspr2		; everything is the same, don't redraw.
 dspr7:
-	jsr sspric 			; delete old sprite, draw new one simultaneously.
+	jsr sspric 		; delete old sprite, draw new one simultaneously.
 	jmp dspr2
 dspr3:
-	jsr ssprib 			; show single sprite.
+	jsr ssprib 		; show single sprite.
 	jmp dspr2
 
 sprcnt:	.byte 0
@@ -6070,68 +6071,65 @@ sprcnt:	.byte 0
 ; Get sprite address calculations.
 ; gspran = new sprite, gsprad = old sprite.
 ;
-; global:	dispx,dispy,ix
-; local:	y
-; calls:	gspra0
+; Input:
+;  IX = sprite address
 ;-----------------------------------------
 
 gspran:
 	ldy #8
-	lda (z80_ix),y 			; new x coordinate.
+	lda (z80_ix),y 		; new y coordinate.
 	sta dispy
 	ldy #9
-	lda (z80_ix),y 			; new y coordinate.
+	lda (z80_ix),y 		; new x coordinate.
 	sta dispx
 	ldy #6
-	lda (z80_ix),y 			; new sprite image.
-	jsr gfrm			; fetch start frame for this sprite.
+	lda (z80_ix),y 		; new sprite image.
+	jsr gfrm		; fetch start frame for this sprite.
 
 	ldy #0
-	lda (z80_hl),y 			; frame in accumulator.
+	lda (z80_hl),y 		; frame in accumulator.
 	ldy #7
 	clc
-	adc (z80_ix),y 			; new add frame number.
+	adc (z80_ix),y 		; new add frame number.
 	jmp gspra0
 
 ;-----------------------------------------
 ; Calculate old sprite address
+;
 ; Input:
 ;  IX = sprite address
-; Output:
-;  HL = sprgfx address
-;  b  = right mask
-;  c  = left mask
-;  scraddr
 ;
-; global:	ix,hl,dispx,dispy,SCADTB_lb,SCADTB_hb
-; local:	y,de,bc,spmask
-; calls:	gfrm
+; Output:
+;  B  = right byte mask
+;  C  = left byte mask
+;  DE = spriteframe address
+;  scraddr = screenaddress(dispx,dispy)
 ;-----------------------------------------
 
 gsprad:
 	ldy #3
-	lda (z80_ix),y		 	; x coordinate.
+	lda (z80_ix),y		; y coordinate.
 	sta dispy
 	ldy #4
-	lda (z80_ix),y		 	; y coordinate.
+	lda (z80_ix),y		; x coordinate.
 	sta dispx
 	ldy #1
-	lda (z80_ix),y 			; sprite image.
-	jsr gfrm 			; fetch start frame for this sprite.
+	lda (z80_ix),y 		; sprite image.
+	jsr gfrm 		; fetch start frame for this sprite.
 
 	ldy #0
-	lda (z80_hl),y 			; frame in accumulator.
+	lda (z80_hl),y 		; frame in accumulator.
 	ldy #2
 	clc
-	adc (z80_ix),y 			; add frame number.
+	adc (z80_ix),y 		; add frame number.
 gspra0:
-	lsr a	  			; multiply by 128.
-	sta z80_d 			; store in d.
+	lsr a	  		; multiply by 128.
+	sta z80_d 		; store in d.
 	lda #0
 	ror a
-	sta z80_e 			; got low byte.
+	sta z80_e 		; got low byte.
 
-	clc 				; address of play sprites.
+	clc 			; address of play sprites.
 	lda z80_e
 	adc #<sprgfx
 	sta z80_e
@@ -6139,25 +6137,25 @@ gspra0:
 	adc #>sprgfx
 	sta z80_d
 
-	lda dispx 			; y coordinate.
-	and #6 				; position within byte boundary.
-	tax	 			; low byte of table displacement.
+	lda dispx 		; y coordinate.
+	and #6 			; position within byte boundary.
+	tax	 		; low byte of table displacement.
 
-	asl a	  			; multiply by 32.
-	asl a  				; already a multiple
-	asl a  				; of 2, so just 4
-	asl a  				; shifts needed.
+	asl a	  		; multiply by 32.
+	asl a  			; already a multiple
+	asl a  			; of 2, so just 4
+	asl a  			; shifts needed.
 
-	clc 				; add to sprite address.
+	clc 			; add to sprite address.
 	adc z80_e
 	sta z80_e
 	bcc :+
 	inc z80_d
 :
-	lda spmask,x		 	; pointer to mask table.
-	sta z80_c 			; left mask.
+	lda spmask,x		 ; pointer to mask table.
+	sta z80_c 		; left mask.
 	lda spmask+1,x
-	sta z80_b 			; right mask.
+	sta z80_b 		; right mask.
 
 ;------------------------------------------------------------------
 ; Drop into screen address routine.
@@ -6185,116 +6183,96 @@ spmask:	.byte 255,0,63,192,15,240,3,252
 ; sspria = single sprite, old (ix).
 ; ssprib = single sprite, new (ix+5).
 ; sspric = both sprites, old (ix) and new (ix+5).
-;
-; global:	-
-; local:	x
-; calls:	gsprad,dline
 ;-----------------------------------------------------------------
 
 sspria:
-	jsr gsprad			; get old sprite address.
+	jsr gsprad		; get old sprite address.
 sspri2:
-	ldx #16				; vertical lines.
+	ldx #16			; vertical lines.
 sspri0:
-	jsr dline			; draw a line.
+	jsr dline		; draw a line.
 	dex
-	bne sspri0
+	bne sspri0		; repeat 16 times
 	rts
 
 ;-----------------------------------------------------------------
-; global:	-
-; local:	-
-; calls:	gspran,sspri2
-;-----------------------------------------------------------------
 
 ssprib:
-	jsr gspran 			; get new sprite address.
+	jsr gspran 		; get new sprite address.
 	jmp sspri2
 
 ;-----------------------------------------------------------------
-; global:	dispx
-; local:	x
-; calls:	gsprad,gspran,dline,exx
-;-----------------------------------------------------------------
 
 sspric:
-	jsr gsprad 			; get old sprite address.
-	jsr exx  			; store addresses.
-	jsr gspran 			; get new sprite addresses.
+	jsr gsprad 		; get old sprite address.
+	jsr exx  		; store addresses.
+	jsr gspran 		; get new sprite addresses.
 
 	ldx #15
 lloop:
-	jsr dline 			; draw a line.
-	jsr exx  			; restore old addresses.
-	jsr dline 			; delete a line.
-	jsr exx  			; flip to new sprite addresses.
+	jsr dline 		; draw a line.
+	jsr exx  		; restore old addresses.
+	jsr dline 		; delete a line.
+	jsr exx  		; flip to new sprite addresses.
 	dex
 	bne lloop
 
-	jsr dline			; draw a line.
-	jsr exx 			; restore old addresses.
+	jsr dline		; draw a line.
+	jsr exx 		; restore old addresses.
 
 ;-------------------------------------------------------------
 ; Drop through.
 ; Line drawn, now work out next target address.
 ;
 ; Input:
-;  de		= spriteaddress
-;  scraddr	= screen address
-;  b		= right mask
-;  c		= left mask
-;
-; global:	de,scraddr,b,c
-; local:	y
-; calls:	-
+;  B  = right mask
+;  C  = left mask
+;  DE = spriteaddress
+;  scraddr = screen address
 ;-------------------------------------------------------------
 
 dline:
 	ldy #0
-	lda (z80_de),y 			; graphic data.
-	and z80_c 			; mask away what's not needed.
-	eor (scraddr),y 		; XOR with what's there.
-	sta (scraddr),y 		; bung it in.
+	lda (z80_de),y 		; graphic data.
+	and z80_c 		; mask away what's not needed.
+	eor (scraddr),y 	; XOR with what's there.
+	sta (scraddr),y 	; bung it in.
 
-	inc scraddr 			; next screen address.
-	inc scraddr 			; next screen address.
+	inc scraddr 		; next screen address.
+	inc scraddr 		; next screen address.
 
-	lda (z80_de),y 			; fetch data.
-	and z80_b 			; mask away unwanted bits.
-	eor (scraddr),y 		; XOR with what's there.
-	sta (scraddr),y 		; bung it in.
+	lda (z80_de),y 		; fetch data.
+	and z80_b 		; mask away unwanted bits.
+	eor (scraddr),y 	; XOR with what's there.
+	sta (scraddr),y 	; bung it in.
 
-	inc z80_e 			; next graphic.
+	inc z80_e 		; next graphic.
 	bne :+
 	inc z80_d
 :
-	dec scraddr 			; one character cell to the left.
+	dec scraddr 		; one character cell to the left.
 
-	lda (z80_de),y 			; second bit of data.
-	eor (scraddr),y 		; XOR with what's there.
-	sta (scraddr),y 		; bung it in.
+	lda (z80_de),y 		; second bit of data.
+	eor (scraddr),y 	; XOR with what's there.
+	sta (scraddr),y 	; bung it in.
 
-	inc z80_e 			; point to next line of data.
+	inc z80_e 		; point to next line of data.
 	bne :+
 	inc z80_d
 :
-	dec scraddr 			; another char left.
+	dec scraddr 		; another char left.
 
 ;----------------------------------------------------------------------
 ; Line drawn, now work out next target address.
-;
-; global:	scraddr
-; local:	-
-; calls:	-
 ;----------------------------------------------------------------------
 
 nline:
 	clc
-	lda scraddr 			; get low byte of address.
+	lda scraddr 		; get low byte of address.
 	adc #$20
-	sta scraddr 			; new low byte of address.
+	sta scraddr 		; new low byte of address.
 	bcc :+
-	inc scraddr+1 			; new high byte of address.
+	inc scraddr+1 		; new high byte of address.
 :
 	rts
 
@@ -6381,57 +6359,61 @@ nattr:
 ;-----------------------------------------------------------
 ; Animates a sprite.
 ;
-; global:	hl,ix
-; local:	y
-; calls:	gfrm
+; Input:
+;  IX = sprite address
+;  HL = last sprite address
 ;-----------------------------------------------------------
 
 animsp:
 	ldy #6
-	lda (z80_ix),y			; sprite image
-	jsr gfrm			; get frame data.
+	lda (z80_ix),y		; sprite image
+	jsr gfrm		; get frame data.
 
-	inc z80_l			; point to frames.
+	inc z80_l		; point to frames.
 	bne :+
 	inc z80_h
 :
 	ldy #7
-	lda (z80_ix),y			; sprite frame.
+	lda (z80_ix),y		; sprite frame.
 	clc
-	adc #1				; next one along.
+	adc #1			; next one along.
 	ldy #0
-	cmp (z80_hl),y			; reached the last frame?
-	bcc anims0			; no, not yet.
-	lda #0				; start at first frame.
+	cmp (z80_hl),y		; reached the last frame?
+	bcc anims0		; no, not yet.
+	lda #0			; start at first frame.
 anims0:
 	ldy #7
-	sta (z80_ix),y			; new frame.
+	sta (z80_ix),y		; new frame.
 	rts
 
 ;--------------------------------------------------------------
 ; Animate back
+;
+; Input:
+;  IX = sprite address
+;  HL = last sprite address
 ;--------------------------------------------------------------
 
 animbk:
 	ldy #6
-	lda (z80_ix),y			; sprite image.
-	jsr gfrm			; get frame data.
+	lda (z80_ix),y		; sprite image.
+	jsr gfrm		; get frame data.
 
-	inc z80_l 			; point to frames.
+	inc z80_l 		; point to frames.
 	bne :+
 	inc z80_h
 :
 	ldy #7
-	lda (z80_ix),y 			; sprite frame.
+	lda (z80_ix),y 		; sprite frame.
 	beq :+
-	jmp rtanb0 			; yes, start at end.
+	jmp rtanb0 		; yes, start at end.
 :
 	ldy #0
-	lda (z80_hl),y 			; last sprite.
+	lda (z80_hl),y 		; last sprite.
 rtanb0:
 	sec
-	sbc #1				; next one along.
-	jmp anims0			; set new frame.
+	sbc #1			; next one along.
+	jmp anims0		; set new frame.
 
 ;--------------------------------------------------------------
 ; Check for collision with other sprite, strict enforcement.

@@ -207,14 +207,14 @@ LET RND 0
 IF KEY RIGHT
     IF CANGORIGHT
         SPRITERIGHT
-        IF KEY FIRE
+        IF KEY FIRE1
         ELSE
             LET IMAGE 2
         ENDIF
         IF KEY DOWN
-            IF KEY FIRE
+            IF KEY FIRE1
             ELSE
-                IF KEY FIRE
+                IF KEY FIRE1
                 ELSE
                     LET IMAGE 3
                 ENDIF
@@ -226,12 +226,12 @@ ENDIF
 IF KEY LEFT
     IF CANGOLEFT
         SPRITELEFT
-        IF KEY FIRE
+        IF KEY FIRE1
         ELSE
             LET IMAGE 6
         ENDIF
         IF KEY UP
-            IF KEY FIRE
+            IF KEY FIRE1
             ELSE
                 LET IMAGE 7
             ENDIF
@@ -244,12 +244,12 @@ IF KEY DOWN
         SPRITEDOWN
         IF KEY RIGHT
         ELSE
-            IF KEY FIRE
+            IF KEY FIRE1
             ELSE
                 LET IMAGE 4
             ENDIF
             IF KEY LEFT
-                IF KEY FIRE
+                IF KEY FIRE1
                 ELSE
                     LET IMAGE 5
                 ENDIF
@@ -263,12 +263,12 @@ IF KEY UP
         SPRITEUP
         IF KEY LEFT
         ELSE
-            IF KEY FIRE
+            IF KEY FIRE1
             ELSE
                 LET IMAGE 0
             ENDIF
             IF KEY RIGHT
-                IF KEY FIRE
+                IF KEY FIRE1
                 ELSE
                     LET IMAGE 1
                 ENDIF
@@ -319,10 +319,10 @@ LET RND 0
 REPEAT 20
     ADD 1 TO OBJ
     IF OBJ = 2
-        IF KEY FIRE
+        IF KEY FIRE1
             ADD 1 TO C
             GET C
-            PUT C Y X
+            PUT C X Y
             SUBTRACT 1 TO C
         ENDIF
     ENDIF
@@ -378,7 +378,7 @@ REPEAT 20
         ENDIF
     ENDIF
     IF COLLISION 1
-        IF KEY FIRE
+        IF KEY FIRE1
             SOUND 0
             OTHER
             LET SETTINGA 1
@@ -397,8 +397,8 @@ REPEAT 20
         GET 0
         GET 1
         GET 2
-        IF KEY FIRE
-            PUT C Y X
+        IF KEY FIRE1
+            PUT C X Y
             SOUND 1
         ENDIF
         LET Y A

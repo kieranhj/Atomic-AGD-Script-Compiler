@@ -1,2 +1,2 @@
-AGD: AGD4.c
-	gcc -o AGD4 AGD4.c
+AGD: AGD6.c
+	gcc -o AGD AGD6.c

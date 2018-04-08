@@ -71,6 +71,8 @@
 ; Game starts here
 ;===============================================================
 
+.segment "CODE"
+
 ;--------------------------------------------------------------
 ; If a font is required...
 ;--------------------------------------------------------------
@@ -2875,9 +2877,10 @@ bsortx:
 ;----------------------------------------------------------
 
 newlev:
-	ldx scno 			; current screen.
-	inx				; next screen.
-	cpx numsc			; total number of screens.
+	lda scno 			; current screen.
+	clc
+	adc #1				; next screen.
+	cmp numsc			; total number of screens.
 	bcs evwon			; yes, game finished.
 	sta scno			; set new level number.
 	jmp rstrt			; restart, clearing all aliens.
@@ -5580,8 +5583,14 @@ dmsg0:
 	ldy #0
 	lda (z80_hl),y		; fetch byte to display.
 	and #127		; remove any end marker.
-	jsr pchar		; display character.
+	cmp #13
+	bne :+
+	lda #0
+	sta dispx
+	jmp dmsg4 
+:	jsr pchar		; display character.
 	jsr nexpos 		; display position.
+dmsg4:
 	bne dmsg2		; not on a new line.
 	jsr nexlin		; next line down.
 dmsg2:
@@ -5718,8 +5727,12 @@ achar:
 nexpos:
 	inc dispx		; move along one position.
 	lda dispx 		; get coordinate.
-	and #31			; reached edge of screen?
+	cmp #32
+	bcc :+
+;	inc dispy
+	lda #0			; reached edge of screen?
 	sta dispx		; set new position.
+:
 	rts 			; return with status in zero flag.
 
 ;-------------------------------------------------
@@ -5730,7 +5743,7 @@ nexlin:
 	inc dispy 		; newline.
 	lda dispy		; vertical position.
 	cmp #24			; past screen edge?
-	bcc :+
+	bcs :+
 	rts			; no, still okay.
 :
 	lda #0			; restart at top.

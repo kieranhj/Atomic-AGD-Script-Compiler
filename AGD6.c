@@ -4337,7 +4337,21 @@ void CR_Ticker( void )
 			}
 			else
 			{
-				Error( "Invalid argument for TICKER" );
+				if ( nArg2 == INS_NUM )						/* if not a string, must be a message number. */
+				{
+					nArg2 = GetNum( 8 );
+					WriteInstruction( "lda #" );
+					WriteNumber( nArg2 );					/* pass both parameters as 16-bit argument. */
+					WriteInstruction( "sta z80_c" );
+					WriteInstruction( "lda #" );
+					WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
+					WriteInstruction( "sta z80_b" );
+					WriteInstruction( "jsr iscrly" );
+				}
+				else
+				{
+					Error( "Invalid argument for TICKER" );
+				}
 			}
 		}
 	}

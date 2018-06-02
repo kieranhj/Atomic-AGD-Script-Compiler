@@ -51,8 +51,13 @@
 
 ; System constants
 
+.if iflag
 	TxtInvert   = $ff	; Invert byte for character printing
 	ScrFillByte = $ff	; Screen fill byte for CLS
+.else
+	TxtInvert   = $00	; Invert byte for character printing
+	ScrFillByte = $00	; Screen fill byte for CLS
+.endif
 	ScrMode     = $f0	; Screen mode:
 				;  $d0 = CLEAR4a colour
 				;  $f0 = CLEAR4  mono
@@ -67,11 +72,20 @@
 	OSRDCH   = $fe94	; get key subroutine
         READKEY  = $fe71	; scan key matrix subroutine
 
+; Conditional compilation flags
+
+;	mflag = 0 		; MENU + INV
+;	pflag = 0		; Particle engine
+;	sflag = 0		; scrollytext
+	fflag = 1		; Fontflag
+
 ;===============================================================
 ; Game starts here
 ;===============================================================
 
 .segment "CODE"
+
+	sei
 
 ;--------------------------------------------------------------
 ; If a font is required...
@@ -82,8 +96,10 @@
 	lda #>(FONT-256)
 	sta FontPtr+1
 
-	jmp game	 	; start the game.
-
+	jsr game	 	; start the game.
+	lda #12			; Clear screen + exit to Basic
+	jmp $fff4
+	
 contrl:	.byte 0			; control, 0 = keyboard, 1 = Kempston, 2 = Sinclair, 3 = Mouse.
 joyval:	.byte 0			; joystick reading.
 frmno:	.byte 0			; selected frame.
@@ -103,7 +119,7 @@ numob:	.byte NUMOBJ		; number of objects in game.
 wntopx:	.byte (8 * WINDOWTOP)
 wnlftx:	.byte (8 * WINDOWLFT)
 wnbotx:	.byte ((WINDOWTOP * 8) + (WINDOWHGT * 8) - 16)
-wnrgtx:	.byte ((WINDOWLFT * 8) + (WINDOWWID * 8) - 16)
+wnrgtx:	.byte ((WINDOWLFT * 8) + (WINDOWWID * 8) - 16)-2
 
 scno:	.byte 0			; present screen number.
 numlif:	.byte 3			; number of lives.
@@ -165,6 +181,7 @@ frmptr:	.word frmlst         ; sprite frames.
 ;  OPT = selected line nr of INV menu
 ;--------------------------------------------------------------
 
+.if mflag
 minve:
 	lda #<(invdis)		; routine address.
 	sta mod0+1		; set up menu routine.
@@ -244,6 +261,8 @@ dbox6:
 :
 	lda z80_a		; reached end of line?
 	cmp #','
+	beq dbox3		; yes.
+	cmp #13
 	beq dbox3		; yes.
 	inc z80_b		; add to this line"s width.
 	lda z80_a
@@ -326,9 +345,10 @@ dbox0:
 	ldy #0			; get character.
 	lda (z80_hl),y
 	cmp #','		; end of line?
-	bne :+
-	jmp dbox1		; yes, next one.
-:
+	beq dbox1		; yes, next one.
+	cmp #13			; end of line?
+	beq dbox1		; yes, next one.
+
 	dec z80_b		; one less to display.
 	and #127		; remove terminator.
 
@@ -362,9 +382,9 @@ dbox9:
 	inc z80_h
 :
 	cmp #','		; another line?
-	bne :+
-	jmp dbox10		; yes, do next line.
-:
+	beq dbox10		; yes, do next line.
+	cmp #13			; another line?
+	beq dbox10		; yes, do next line.
 	cmp #128		; end of message?
 	bcs :+
 	jmp dbox11		; yes, finish message.
@@ -467,6 +487,11 @@ dbox13:
 	bne :+
 	jmp dbox2		; yes, do next line.
 :
+	cmp #13			; another line?
+	bne :+
+	jmp dbox2		; yes, do next line.
+:
+
 	bpl :+			; end of message?
 	jmp dbox11		; yes, finish message.
 :
@@ -556,17 +581,16 @@ fopt:
 fopt0:
 	jsr fobj		; find next object in inventory.
 	dec tmp+2
-	beq :+
-	jmp fopt0		; repeat for relevant steps down the list.
-:
+	bne fopt0		; repeat for relevant steps down the list.
+
 	lda combyt		; get option.
 	sta varopt		; store the option.
 	dec varopt		; one less, due to where we increment combyt.
 	jmp redraw		; redraw the screen.
 fobj:
-	lda combyt		; object number.
+	ldy combyt		; object number.
 	inc combyt		; ready for next item.
-	cmp #0
+	cpy #0
 	bne :+			; in case we loop back to zero.
 	rts
 :
@@ -581,13 +605,23 @@ bwid:	.byte 0              ; box/menu width.
 blen:	.byte 0              ; box/menu height.
 btop:	.byte 0              ; box coordinates.
 blft:	.byte 0
+.endif
 
 ;----------------------------------------------------
 ; Wait for keypress.
 ;----------------------------------------------------
 
 prskey:
-	jmp OSRDCH		; wait until key pressed
+	tya
+	pha
+prsloop:
+	jsr vsync
+	jsr $fe71
+	cpy #255
+	beq prsloop		; wait until key pressed
+	pla
+	tay
+	rts
 
 ;----------------------------------------------------
 ; Delay routine 1/50 sec
@@ -695,8 +729,46 @@ iniob0:
 ;-------------------------------------------------------------
 
 vsync:
+	pha
+	tya
+	pha
+	txa
+	pha
 	jsr joykey		; read joystick/keyboard.
-	jmp SCRSYNC1		; Wait for flyback
+vsync1:
+;	lda $b809
+;	bpl vsync1
+;	sei
+;	lda #<20000
+;	sta $b808
+;	lda #>20000
+;	sta $b809
+
+	jsr SCRSYNC1		; Wait for flyback
+	lda clock
+	and #1
+	bne:+
+	jsr proshr
+:
+	lda sndtyp
+	beq sndskip
+sndloop:
+	lda $b002
+	ldy sndtyp
+sndwait:
+	dey
+	bne sndwait
+	eor #4
+	sta $b002
+	dec sndtyp
+	bne sndloop
+sndskip: 
+	pla
+	tax
+	pla
+	tay
+	pla
+	rts
 
 ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ; Sound + border colour, NOT IMPLEMENTED!!
@@ -936,7 +1008,7 @@ vsync:
 ;	jmp vsynca
 ;
 ;	; 98.00.00 sndtyp .byte 0
-;sndtyp:	.byte 0
+sndtyp:	.byte 0
 ;
 ;
 ; clock  .byte 0              ; last clock reading.
@@ -1225,27 +1297,33 @@ cspr1:
 ; Scrolly text and puzzle variables. NOT IMPLEMENTED!!
 ;----------------------------------------------------
 
+.if sflag
 txtbit:	.byte 128		; bit to write.
 txtwid:	.byte 16		; width of ticker message.
 txtpos:	.word msgdat
 txtini:	.word msgdat
 txtscr:	.word 16406
+.endif
 
+;----------------------------------------------------
 ; Specialist routines.
 ; Process shrapnel.
-
+;----------------------------------------------------
 proshr:
+.if pflag
 	lda #<SHRAPN		; table.
 	sta z80_x
 	lda #>SHRAPN
 	sta z80_i
 
-	ldx #NUMSHR		; shrapnel pieces to process.
+	lda #NUMSHR		; shrapnel pieces to process.
+	sta shrctr
 prosh0:
 	ldy #0
 	lda (z80_ix),y		; on/off marker.
+	asl a
 proshx:
-	bmi :+
+	bcs :+
 	jsr prosh1 		; on, so process it.
 :
 	clc
@@ -1255,1456 +1333,864 @@ proshx:
 	bcc :+
 	inc z80_i
 :
-	dex			; round again.
+	dec shrctr		; round again.
 	bne prosh0
-	jmp scrly
+.endif
+.if sflag
+	jsr scrly
+.endif
+	rts
+
+.if pflag
+shrctr:	.byte 0
+
+;----------------------------------------------------
+; Proces shrapnel piece
+;----------------------------------------------------
 
 prosh1:
-	; 41.04.xx push bc 	; store counter.
-	lda z80_b
-	pha
-	lda z80_c
-	pha
+	jsr plot 		; delete the pixel.
 
-	; 04.00.xx call plot 	; delete the pixel.
-	jsr plot
-
-	; 29.03.01 ld a, (ix+0)	; restore shrapnel type.
-	ldy #0
-	lda (z80_ix),y
-	sta z80_a
-
-	; 29.04.00 ld hl, shrptr	; shrapnel routine pointers.
-	lda #<(shrptr)
+	lda #<shrptr		; shrapnel routine pointers.
 	sta z80_l
-	lda #>(shrptr)
+	lda #>shrptr
 	sta z80_h
 
-	; 04.00.xx call prosh2 	; run the routine.
-	jsr prosh2
+	ldy #0
+	lda (z80_ix),y		; restore shrapnel type.
+	jsr prosh2 		; run the routine.
+	jsr chkxy		; check x and y are good before we redisplay.
 
-	; 04.00.xx call chkxy 	; check x and y are good before we redisplay.
-	jsr chkxy
-
-	; 40.04.xx pop bc 	; restore counter.
-	pla
-	sta z80_c
-	pla
-	sta z80_b
-
-	; 29.04.00 ld de, SHRSIZ 	; distance to next.
-	lda #<(SHRSIZ)
+	lda #<SHRSIZ 		; distance to next.
 	sta z80_e
-	lda #>(SHRSIZ)
+	lda #>SHRSIZ
 	sta z80_d
-
-	; 43.xx.xx rts  	
 	rts
+
+;----------------------------------------------------
+; Run the routine
+;----------------------------------------------------
 
 prosh2:
-	; 49.xx.xx rlca  	; 2 bytes per address.
-	rol z80_a
-
-	; 29.03.03 ld e, a 	; copy to de.
-	lda z80_a
-	sta z80_e
-
-	; 01.04.04 add hl, de 	; point to address of routine.
-	jsr add_hl_de
-
-	; 29.03.01 ld a, (hl) 	; get address low.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 22.04.xx inc hl 	; point to second byte.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 29.03.01 ld h, (hl) 	; fetch high byte from table.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_h
-
-	; 29.03.03 ld l, a 	; put low byte in l.
-	lda z80_a
+	asl a 			; 2 bytes per address.
+	tay
+	lda shrptr,y
 	sta z80_l
+	lda shrptr+1,y 		; fetch high byte from table.
+	sta z80_h
+	jmp (z80_hl) 		; jump to routine.
 
-	; 27.01.xx jp (hl) 	; jump to routine.
-	jmp (z80_hl)
+;----------------------------------------------------
+; Paricle routine table
+;----------------------------------------------------
 
-	; 98.00.01 shrptr .word laser          ; laser.
-shrptr:	.word laser          ; laser.
+shrptr:	.word laser		; laser.
+	.word trail		; vapour trail.
+	.word shrap		; shrapnel from explosion.
+	.word dotl		; horizontal starfield left.
+	.word dotr		; horizontal starfield right.
+	.word dotu		; vertical starfield up.
+	.word dotd		; vertical starfield down.
+	.word ptcusr		; user particle.
 
-	; 98.00.01 .word trail          ; vapour trail.
-	.word trail          ; vapour trail.
-
-	; 98.00.01 .word shrap          ; shrapnel from explosion.
-	.word shrap          ; shrapnel from explosion.
-
-	; 98.00.01 .word dotl           ; horizontal starfield left.
-	.word dotl           ; horizontal starfield left.
-
-	; 98.00.01 .word dotr           ; horizontal starfield right.
-	.word dotr           ; horizontal starfield right.
-
-	; 98.00.01 .word dotu           ; vertical starfield up.
-	.word dotu           ; vertical starfield up.
-
-	; 98.00.01 .word dotd           ; vertical starfield down.
-	.word dotd           ; vertical starfield down.
-
-	; 98.00.01 .word ptcusr         ; user particle.
-	.word ptcusr         ; user particle.
-
-
+;----------------------------------------------------
 ; Explosion shrapnel.
+;----------------------------------------------------
 
 shrap:
-	; 29.03.01 ld e, (ix+1) 	; get the angle.
 	ldy #1
-	lda (z80_ix),y
-	sta z80_e
-
-	; 29.03.05 ld d, 0 	; no high byte.
-	lda #0; no high byte.
-	sta z80_d
-
-	; 29.04.00 ld hl, shrsin 	; shrapnel sine table.
-	lda #<(shrsin)
+	lda (z80_ix),y 		; get the angle.
+	clc
+	adc #<shrsin		; shrapnel sine table.
 	sta z80_l
-	lda #>(shrsin)
+	lda #>shrsin
+	adc #0
 	sta z80_h
 
-	; 01.04.04 add hl, de 	; point to sine.
-	jsr add_hl_de
-
-	; 29.03.01 ld e, (hl) 	; fetch value from table.
 	ldy #0
-	lda (z80_hl),y
+	lda (z80_hl),y 		; fetch value from table.
 	sta z80_e
-
-	; 22.04.xx inc hl 	; next byte of table.
-	inc z80_l
+	inc z80_l 		; next byte of table.
 	bne :+
 	inc z80_h
 :
-	; 29.03.01 ld d, (hl) 	; fetch value from table.
 	ldy #0
-	lda (z80_hl),y
+	lda (z80_hl),y		; fetch value from table.
 	sta z80_d
-
-	; 22.04.xx inc hl 	; next byte of table.
-	inc z80_l
+	inc z80_l		; next byte of table.
 	bne :+
 	inc z80_h
 :
-	; 29.03.01 ld c, (hl) 	; fetch value from table.
 	ldy #0
-	lda (z80_hl),y
+	lda (z80_hl),y 		; fetch value from table.
 	sta z80_c
-
-	; 22.04.xx inc hl 	; next byte of table.
-	inc z80_l
+	inc z80_l 		; next byte of table.
 	bne :+
 	inc z80_h
 :
-	; 29.03.01 ld b, (hl) 	; fetch value from table.
 	ldy #0
-	lda (z80_hl),y
+	lda (z80_hl),y 		; fetch value from table.
 	sta z80_b
 
-	; 29.03.01 ld l, (ix+2) 	; x coordinate in hl.
 	ldy #2
-	lda (z80_ix),y
-	sta z80_l
-
-	; 29.03.01 ld h, (ix+3) 	
+	lda (z80_ix),y 		; x coordinate in hl.
+	clc
+	adc z80_e		; add sine lb
+	sta (z80_ix),y		; store new coordinate lb.
 	ldy #3
 	lda (z80_ix),y
-	sta z80_h
+	adc z80_d		; add sine hb
+	sta (z80_ix),y		; store new coordinate hb.
 
-	; 01.04.04 add hl, de 	; add sine.
-	jsr add_hl_de
-
-	; 29.01.03 ld (ix+2), l 	; store new coordinate.
-	lda z80_l
-	ldy #2
-	sta (z80_ix),y
-
-	; 29.01.03 ld (ix+3), h 	
-	lda z80_h
-	ldy #3
-	sta (z80_ix),y
-
-	; 29.03.01 ld l, (ix+4) 	; y coordinate in hl.
 	ldy #4
-	lda (z80_ix),y
-	sta z80_l
-
-	; 29.03.01 ld h, (ix+5) 	
+	lda (z80_ix),y	 	; y coordinate in hl.
+	clc
+	adc z80_c		; add cosine lb
+	sta (z80_ix),y		; store new coordinate lb.
 	ldy #5
 	lda (z80_ix),y
-	sta z80_h
+	adc z80_b		; add cosine lb
+	sta (z80_ix),y		; store new coordinate hb.
 
-	; 01.04.04 add hl, bc 	; add cosine.
-	jsr add_hl_bc
-
-	; 29.01.03 ld (ix+4), l 	; store new coordinate.
-	lda z80_l
-	ldy #4
-	sta (z80_ix),y
-
-	; 29.01.03 ld (ix+5), h 	
-	lda z80_h
-	ldy #5
-	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
 	rts
+
+;----------------------------------------------------
+; Move dots
+;----------------------------------------------------
 
 dotl:
-	; 13.01.xx dec (ix+5) 	; move left.
-	ldy #0
-	lda (z80_ix+5),y
+	ldy #5
+	lda (z80_ix),y
 	sec
-	sbc #1
-	sta (z80_ix+5),y
-
-	; 43.xx.xx rts  	
+	sbc #1		 	; move left.
+	sta (z80_ix),y
 	rts
-
 dotr:
-	; 22.01.xx inc (ix+5) 	; move left.
 	ldy #5
 	lda (z80_ix),y
 	clc
-	adc #1
+	adc #1		 	; move left.
 	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
 	rts
-
 dotu:
-	; 13.01.xx dec (ix+3) 	; move up.
-	ldy #0
-	lda (z80_ix+3),y
+	ldy #3
+	lda (z80_ix),y
 	sec
-	sbc #1
-	sta (z80_ix+3),y
-
-	; 43.xx.xx rts  	
+	sbc #1		 	; move up.
+	sta (z80_ix),y
 	rts
-
 dotd:
-	; 22.01.xx inc (ix+3) 	; move down.
 	ldy #3
 	lda (z80_ix),y
 	clc
-	adc #1
+	adc #1			; move down.
 	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
 	rts
 
-
+;----------------------------------------------------
 ; Check coordinates are good before redrawing at new position.
+;
+; left:   X>L		X=L	Ok
+; right:  R+15>X	X=R	Ok
+; top:    Y>T		Y=T	Ok
+; bottom: B+15>Y	Y=B	Ok
+;----------------------------------------------------
 
 chkxy:
-	; 29.04.00 ld hl, wntopx 	; window top.
-	lda #<(wntopx)
-	sta z80_l
-	lda #>(wntopx)
-	sta z80_h
 
-	; 29.03.01 ld a, (ix+3) 	; fetch shrapnel coordinate.
+; top:    Y>T		Y=T	Ok
+
 	ldy #3
-	lda (z80_ix),y
-	sta z80_a
-
-	; 06.01.xx cp (hl) 	; compare with top window limit.
-	lda z80_a
-	ldy #0
-	cmp (z80_hl),y
-
-	; 28.06.00 jr c, kilshr 	; out of window, kill shrapnel.
-	bcc :+
-	jmp kilshr
+	lda (z80_ix),y	 	; fetch shrapnel coordinate.
+	cmp wntopx		; window top.
+	bcs :+			; compare with top window limit.
+	jmp kilshr		; out of window, kill shrapnel.
 :
-	; 22.04.xx inc hl 	; left edge.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 29.03.01 ld a, (ix+5) 	; fetch shrapnel coordinate.
+; left:   X>L		X=L	Ok
+
 	ldy #5
-	lda (z80_ix),y
-	sta z80_a
-
-	; 06.01.xx cp (hl) 	; compare with left window limit.
-	lda z80_a
-	ldy #0
-	cmp (z80_hl),y
-
-	; 28.06.00 jr c, kilshr 	; out of window, kill shrapnel.
-	bcc :+
-	jmp kilshr
+	lda (z80_ix),y	 	; fetch shrapnel coordinate.
+	cmp wnlftx		; left edge.
+	bcs :+			; compare with left window limit.
+	jmp kilshr		; out of window, kill shrapnel.
 :
-	; 22.04.xx inc hl 	; point to bottom.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 29.03.01 ld a, (hl) 	; fetch window limit.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
+; bottom: B+15>Y	Y=B	Ok
 
-	; 01.03.05 add a, 15 	; add height of sprite.
-	lda #(15)
+	lda wnbotx		; point to bottom.
 	clc
-	adc z80_a
-	sta z80_a
-
-	; 06.01.xx cp (ix+3) 	; compare with shrapnel x coordinate.
-	lda z80_a
-	ldy #0
-	cmp (z80_ix+3),y
-
-	; 28.06.00 jr c, kilshr 	; off screen, kill shrapnel.
-	bcc :+
-	jmp kilshr
+	adc #15
+	ldy #3
+	cmp (z80_ix),y	 	; fetch shrapnel coordinate.
+	bcs :+			; compare with shrapnel x coordinate.
+	jmp kilshr		; off screen, kill shrapnel..
 :
-	; 22.04.xx inc hl 	; point to right edge.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 29.03.01 ld a, (hl) 	; fetch shrapnel y coordinate.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
+; right:  R+15>X	X=R	Ok
 
-	; 01.03.05 add a, 15 	; add width of sprite.
-	lda #(15)
+	lda wnrgtx		; point to right edge.
 	clc
-	adc z80_a
-	sta z80_a
-
-	; 06.01.xx cp (ix+5) 	; compare with window limit.
-	lda z80_a
-	ldy #0
-	cmp (z80_ix+5),y
-
-	; 28.06.00 jr c, kilshr 	; off screen, kill shrapnel.
-	bcc :+
-	jmp kilshr
+	adc #15
+	ldy #5
+	cmp (z80_ix),y	 	; fetch shrapnel coordinate.
+	bcs :+			; compare with window limit.
+	jmp kilshr		; off screen, kill shrapnel.
 :
 
+;----------------------------------------------------
 ; Drop through.
 ; Display shrapnel.
+;----------------------------------------------------
 
 plot:
-	; 29.03.01 ld l, (ix+3) 	; x integer.
 	ldy #3
-	lda (z80_ix),y
-	sta z80_l
-
-	; 29.03.01 ld h, (ix+5) 	; y integer.
+	lda (z80_ix),y		; y integer.
+	sta dispy	 	; workspace coordinates.
 	ldy #5
-	lda (z80_ix),y
-	sta z80_h
+	lda (z80_ix),y	 	; x integer.
+	sta dispx 		; workspace coordinates.
 
-	; 29.02.04 ld (dispx), hl 	; workspace coordinates.
-	lda z80_l
-	sta dispx
-	lda z80_h
-	sta dispx+1
-
-	; 29.03.01 ld a, (ix+0) 	; type.
 	ldy #0
-	lda (z80_ix),y
-	sta z80_a
-
-	; 02.03.xx and a 	; is it a laser?
-	lda z80_a
-	and z80_a
-
-	; 28.06.00 jr z, plot1 	; yes, draw laser instead.
-	bne :+
-	jmp plot1
+	lda (z80_ix),y 		; type.
+	bne :+			; is it a laser?
+	jmp plot1 		; yes, draw laser instead.
 :
 plot0:
-	; 29.03.03 ld a, h 	; which pixel within byte do we
-	lda z80_h
-	sta z80_a
+	lda dispx		; which pixel within byte do we
+	and #7			; want to set first?
+	tay
+	lda dots,y 		; table of small pixel positions.
+	sta z80_e 		; get value.
 
-	; 02.05.xx and 7 	; want to set first?
-	lda z80_a
-	and #7
-
-	; 29.03.05 ld d, 0 	; no high byte.
-	lda #0; no high byte.
-	sta z80_d
-
-	; 29.03.03 ld e, a 	; copy to de.
-	lda z80_a
-	sta z80_e
-
-	; 29.04.00 ld hl, dots 	; table of small pixel positions.
-	lda #<(dots)
-	sta z80_l
-	lda #>(dots)
-	sta z80_h
-
-	; 01.04.04 add hl, de 	; hl points to values we want to POKE to screen.
-	jsr add_hl_de
-
-	; 29.03.01 ld e, (hl) 	; get value.
+	jsr scadd 		; screen address.
 	ldy #0
-	lda (z80_hl),y
-	sta z80_e
-
-	; 04.00.xx call scadd 	; screen address.
-	jsr scadd
-
-	; 29.03.01 ld a, (hl) 	; see what's already there.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 64.03.xx xor e 	; merge with pixels.
-	lda z80_a
+	lda (scraddr),y		; see what's already there.
 	eor z80_e
-	sta z80_a
-
-	; 29.01.03 ld (hl), a 	; put back on screen.
-	lda z80_a
-	ldy #0
-	sta (z80_hl),y
-
-	; 43.xx.xx rts  	
+	sta (scraddr),y 	; put back on screen.
 	rts
 
 plot1:
-	; 04.00.xx call scadd 	; screen address.
-	jsr scadd
-
-	; 29.03.01 ld a, (hl) 	; fetch byte there.
+	jsr scadd 		; screen address.
 	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 11.xx.xx cpl  	; toggle all bits.
-	lda #255
-	sec
-	sbc z80_a
-	sta z80_a
-
-	; 29.01.03 ld (hl), a 	; new byte.
-	lda z80_a
-	ldy #0
-	sta (z80_hl),y
-
-	; 43.xx.xx rts  	
+	lda (scraddr),y 	; fetch byte there.
+	eor #255 		; toggle all bits.
+	sta (scraddr),y 	; new byte.
 	rts
+
+;----------------------------------------------------
+; Switch off shrapnel
+;----------------------------------------------------
 
 kilshr:
-	; 29.01.05 ld (ix+0), 128 	; switch off shrapnel.
 	lda #128
 	ldy #0
-	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
+	sta (z80_ix),y	; switch off shrapnel.
 	rts
 
-	; 98.00.01 shrsin .word 0,1024,391,946,724,724,946,391
+;----------------------------------------------------
+; Sine/cosine table
+;----------------------------------------------------
+
 shrsin:	.word 0,1024,391,946,724,724,946,391
-
-	; 98.00.01 .word 1024,0,946,65144,724,64811,391,64589
 	.word 1024,0,946,65144,724,64811,391,64589
-
-	; 98.00.01 .word 0,64512,65144,64589,64811,64811,64589,65144
 	.word 0,64512,65144,64589,64811,64811,64589,65144
-
-	; 98.00.01 .word 64512,0,64589,391,64811,724,65144,946
 	.word 64512,0,64589,391,64811,724,65144,946
 
+;----------------------------------------------------
+; Create trail
+;----------------------------------------------------
+
 trail:
-	; 13.01.xx dec (ix+1) 	; time remaining.
-	ldy #0
-	lda (z80_ix+1),y
+	ldy #1
+	lda (z80_ix),y 	; time remaining.
 	sec
 	sbc #1
-	sta (z80_ix+1),y
-
-	; 27.06.00 jp z, trailk 	; time to switch it off.
+	sta (z80_ix),y
 	bne :+
-	jmp trailk
+	jmp trailk		; time to switch it off.
 :
-	; 04.00.xx call qrand 	; get a random number.
-	jsr qrand
-
-	; 52.xx.xx rra  	; x or y axis?
-	lsr z80_a
-
-	; 28.06.00 jr c, trailv 	; use x.
+	jsr qrand		; get a random number.
+	lsr a 			; x or y axis?
 	bcc :+
-	jmp trailv
+	jmp trailv		; use y.
 :
-	; 52.xx.xx rra  	; which direction?
-	lsr z80_a
+; Trail horizontal
 
-	; 28.06.00 jr c, traill 	; go left.
+	lsr a 			; which direction?
 	bcc :+
-	jmp traill
+	jmp traill		; go left.
 :
-	; 22.01.xx inc (ix+5) 	; go right.
+; Trail right
+
 	ldy #5
 	lda (z80_ix),y
 	clc
-	adc #1
+	adc #1	 		; go right.
 	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
 	rts
+
+; Trail left
 
 traill:
-	; 13.01.xx dec (ix+5) 	; go left.
-	ldy #0
-	lda (z80_ix+5),y
+	ldy #5
+	lda (z80_ix),y
 	sec
-	sbc #1
-	sta (z80_ix+5),y
-
-	; 43.xx.xx rts  	
+	sbc #1 			; go left.
+	sta (z80_ix),y
 	rts
+
+; Trail vertical
 
 trailv:
-	; 52.xx.xx rra  	; which direction?
-	lsr z80_a
-
-	; 28.06.00 jr c, trailu 	; go up.
+	lsr a		 	; which direction?
 	bcc :+
-	jmp trailu
+	jmp trailu		; go up.
 :
-	; 22.01.xx inc (ix+3) 	; go down.
+; Trail down
+
 	ldy #3
 	lda (z80_ix),y
 	clc
-	adc #1
+	adc #1 			; go down.
 	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
 	rts
+
+; Trail up
 
 trailu:
-	; 13.01.xx dec (ix+3) 	; go up.
-	ldy #0
-	lda (z80_ix+3),y
+	ldy #3
+	lda (z80_ix),y
 	sec
-	sbc #1
-	sta (z80_ix+3),y
-
-	; 43.xx.xx rts  	
+	sbc #1 			; go up.
+	sta (z80_ix),y
 	rts
+
+; Kill trail
 
 trailk:
-	; 29.01.05 ld (ix+3), 200 	; set off-screen to kill vapour trail.
-	lda #200
+	lda #200		; set off-screen to kill vapour trail.
 	ldy #3
 	sta (z80_ix),y
-
-	; 43.xx.xx rts  	
 	rts
 
+;----------------------------------------------------
+; Create laser beam
+;----------------------------------------------------
+
 laser:
-	; 29.03.01 ld a, (ix+1) 	; direction.
 	ldy #1
-	lda (z80_ix),y
-	sta z80_a
-
-	; 52.xx.xx rra  	; left or right?
-	lsr z80_a
-
-	; 28.06.00 jr nc, laserl 	; move left.
+	lda (z80_ix),y 		; direction.
+	ror a 			; left or right?
 	bcs :+
-	jmp laserl
+	jmp laserl		; move left.
 :
-	; 29.03.05 ld b, 8 	; distance to travel.
-	lda #8; distance to travel.
-	sta z80_b
+; Laser right
 
-	; 28.00.xx jr laserm 	; move laser.
-	jmp laserm
+	lda #8			; distance to travel.
+	sta z80_b
+	jmp laserm		; move laser.
+
+; Laser left
 
 laserl:
-	; 29.03.05 ld b, 248 	; distance to travel.
-	lda #248; distance to travel.
+	lda #248		; distance to travel.
 	sta z80_b
-
 laserm:
-	; 29.03.01 ld a, (ix+5) 	; y position.
 	ldy #5
-	lda (z80_ix),y
-	sta z80_a
-
-	; 01.03.03 add a, b 	; add distance.
-	lda z80_a
+	lda (z80_ix),y		; x position.
 	clc
-	adc z80_b
-	sta z80_a
-
-	; 29.01.03 ld (ix+5), a 	; set new y coordinate.
-	lda z80_a
-	ldy #5
-	sta (z80_ix),y
-
+	adc z80_b		; add distance.
+	sta (z80_ix),y		; set new x coordinate.
 
 ; Test new block.
 
-	; 29.02.03 ld (dispy), a 	; set y for block collision detection purposes.
-	lda z80_a
-	sta dispy
-
-	; 29.03.01 ld a, (ix+3) 	; get x.
+	sta dispx 		; set x for block collision detection purposes.
 	ldy #3
-	lda (z80_ix),y
-	sta z80_a
-
-	; 29.02.03 ld (dispx), a 	; set coordinate for collision test.
-	lda z80_a
-	sta dispx
-
-	; 04.00.xx call tstbl 	; get block type there.
-	jsr tstbl
-
-	; 06.00.xx cp WALL 	; is it solid?
-	lda z80_a
-	cmp WALL
-
-	; 28.06.00 jr z, trailk 	; yes, it cannot pass.
+	lda (z80_ix),y 		; get y.
+	sta dispy		; set coordinate for collision test.
+	jsr tstbl 		; get block type there.
+	cmp #WALL		; is it solid?
 	bne :+
-	jmp trailk
+	jmp trailk		; yes, it cannot pass.
 :
-	; 43.xx.xx rts  	
 	rts
 
-	; 98.00.00 dots   .byte 128,64,32,16,8,4,2,1
+;----------------------------------------------------
+; Dots mask
+;----------------------------------------------------
+
 dots:	.byte 128,64,32,16,8,4,2,1
 
 
+;----------------------------------------------------
 ; Plot, preserving de.
+;----------------------------------------------------
 
 plotde:
-	; 41.04.xx push de 	; put de on stack.
-	lda z80_d
+	lda z80_d 		; put de on stack.
 	pha
 	lda z80_e
 	pha
 
-	; 04.00.xx call plot 	; plot pixel.
-	jsr plot
+	jsr plot 		; plot pixel.
 
-	; 40.04.xx pop de 	; restore de from stack.
-	pla
+	pla			; restore de from stack.
 	sta z80_e
 	pla
 	sta z80_d
 
-	; 43.xx.xx rts  	
 	rts
 
-
+;----------------------------------------------------
 ; Shoot a laser.
+;----------------------------------------------------
 
 shoot:
-	; 29.03.03 ld c, a 	; store direction in c register.
-	lda z80_a
-	sta z80_c
-
-	; 29.03.01 ld a, (ix+8) 	; y coordinate.
+	sta z80_c		; store direction in c register.
 	ldy #8
-	lda (z80_ix),y
-	sta z80_a
-
+	lda (z80_ix),y 		; y coordinate.
 shoot1:
-	; 01.03.05 add a, 7 	; down 7 pixels.
-	lda #(7)
 	clc
-	adc z80_a
-	sta z80_a
+	adc #7 			; down 7 pixels.
+	sta z80_l 		; puty y coordinate in l.
 
-	; 29.03.03 ld l, a 	; puty x coordinate in l.
-	lda z80_a
-	sta z80_l
-
-	; 29.03.01 ld h, (ix+9) 	; x coordinate in h.
 	ldy #9
-	lda (z80_ix),y
+	lda (z80_ix),y 		; x coordinate in h.
 	sta z80_h
 
-	; 41.04.xx push ix 	; store pointer to sprite.
-	lda z80_i
+	lda z80_i		; store pointer to sprite.
 	pha
 	lda z80_x
 	pha
 
-	; 04.00.xx call fpslot 	; find particle slot.
-	jsr fpslot
-
-	; 28.06.00 jr nc, vapou2 	; failed, restore ix.
+	jsr fpslot 		; find particle slot.
 	bcs :+
-	jmp vapou2
+	jmp vapou2		; failed, restore ix.
 :
-	; 29.01.05 ld (ix+0), 0 	; set up a laser.
 	lda #0
 	ldy #0
-	sta (z80_ix),y
+	sta (z80_ix),y 		; set up a laser.
 
-	; 29.01.03 ld (ix+1), c 	; set the direction.
 	lda z80_c
 	ldy #1
-	sta (z80_ix),y
+	sta (z80_ix),y 		; set the direction.
 
-	; 29.01.03 ld (ix+3), l 	; set x coordinate.
 	lda z80_l
 	ldy #3
-	sta (z80_ix),y
+	sta (z80_ix),y		; set y coordinate.
 
-	; 51.03.xx rr c 	; check direction we want.
-	lsr z80_c
-
-	; 28.06.00 jr c, shootr 	; shoot right.
+	ror z80_c		; check direction we want.
 	bcc :+
-	jmp shootr
+	jmp shootr		; shoot right.
 :
-	; 29.03.03 ld a, h 	; y position.
-	lda z80_h
-	sta z80_a
-
-
-; dec a               ; left a pixel.
+	lda z80_h		; X position.
 shoot0:
-
-	; 02.05.xx and 248 	; align on character boundary.
-	lda z80_a
-	and #248
-
-	; 29.01.03 ld (ix+5), a 	; set y coordinate.
-	lda z80_a
+	and #248		; align on character boundary.
 	ldy #5
-	sta (z80_ix),y
-
-	; 28.00.xx jr vapou0 	; draw first image.
-	jmp vapou0
-
+	sta (z80_ix),y		; set x coordinate.
+	jmp vapou0 		; draw first image.
 shootr:
-	; 29.03.03 ld a, h 	; y position.
-	lda z80_h
-	sta z80_a
-
-	; 01.03.05 add a, 15 	; look right.
-	lda #(15)
+	lda z80_h		; x position.
 	clc
-	adc z80_a
-	sta z80_a
+	adc #15			; look right.
+	jmp shoot0		; align and continue.
 
-	; 28.00.xx jr shoot0 	; align and continue.
-	jmp shoot0
-
-
+;----------------------------------------------------
 ; Create a bit of vapour trail.
+;----------------------------------------------------
 
 vapour:
-	; 41.04.xx push ix 	; store pointer to sprite.
-	lda z80_i
+	lda z80_i		; store pointer to sprite.
 	pha
 	lda z80_x
 	pha
 
-	; 29.03.01 ld l, (ix+8) 	; y coordinate.
 	ldy #8
-	lda (z80_ix),y
+	lda (z80_ix),y 		; y coordinate.
+	clc
+	adc #7			; mid-point of sprite.
 	sta z80_l
 
-	; 29.03.01 ld h, (ix+9) 	; x coordinate.
 	ldy #9
-	lda (z80_ix),y
+	lda (z80_ix),y 		; x coordinate.
+	adc #7
 	sta z80_h
 
-vapou3:
-	; 29.04.00 ld de, 7*256+7 	; mid-point of sprite.
-	lda #<(7*256+7)
-	sta z80_e
-	lda #>(7*256+7)
-	sta z80_d
-
-	; 01.04.04 add hl, de 	; point to centre of sprite.
-	jsr add_hl_de
-
-	; 04.00.xx call fpslot 	; find particle slot.
-	jsr fpslot
-
-	; 28.06.00 jr c, vapou1 	; no, we can use it.
+	jsr fpslot 		; find particle slot.
 	bcc :+
-	jmp vapou1
+	jmp vapou1		; no, we can use it.
 :
 vapou2:
-	; 40.04.xx pop ix 	; restore sprite pointer.
 	pla
 	sta z80_x
 	pla
 	sta z80_i
-
-	; 43.xx.xx rts  	; out of slots, can't generate anything.
 	rts
-
 vapou1:
-	; 29.01.03 ld (ix+3), l 	; set up x.
 	lda z80_l
 	ldy #3
-	sta (z80_ix),y
+	sta (z80_ix),y		; set up y.
 
-	; 29.01.03 ld (ix+5), h 	; set up y coordinate.
 	lda z80_h
 	ldy #5
-	sta (z80_ix),y
+	sta (z80_ix),y 		; set up x coordinate.
 
-	; 04.00.xx call qrand 	; get quick random number.
-	jsr qrand
-
-	; 02.05.xx and 15 	; random time.
-	lda z80_a
-	and #15
-
-	; 01.03.05 add a, 15 	; minimum time on screen.
-	lda #(15)
+	jsr qrand		; get quick random number.
+	and #15			; random time.
 	clc
-	adc z80_a
-	sta z80_a
-
-	; 29.01.03 ld (ix+1), a 	; set time on screen.
-	lda z80_a
+	adc #15			; minimum time on screen.
 	ldy #1
-	sta (z80_ix),y
+	sta (z80_ix),y		; set time on screen.
 
-	; 29.01.05 ld (ix+0), 1 	; define particle as vapour trail.
 	lda #1
 	ldy #0
-	sta (z80_ix),y
-
+	sta (z80_ix),y		; define particle as vapour trail.
 vapou0:
-	; 04.00.xx call chkxy 	; plot first position.
-	jsr chkxy
-
-	; 28.00.xx jr vapou2 	
+	jsr chkxy		; plot first position.
 	jmp vapou2
 
-
+;----------------------------------------------------
 ; Create a user particle.
+;----------------------------------------------------
 
 ptusr:
-	; 17.04.00 ex af, af" 	; store timer.
-	jsr ex_af_afs
+	sta z80_f		; store timer.
 
-	; 29.03.01 ld l, (ix+8) 	; y coordinate.
 	ldy #8
-	lda (z80_ix),y
+	lda (z80_ix),y 		; y coordinate.
+	clc
+	adc #7			; mid-point of sprite.
 	sta z80_l
 
-	; 29.03.01 ld h, (ix+9) 	; x coordinate.
 	ldy #9
-	lda (z80_ix),y
+	lda (z80_ix),y 		; x coordinate.
+	clc
+	adc #7			; mid-point of sprite.
 	sta z80_h
 
-	; 29.04.00 ld de, 7*256+7 	; mid-point of sprite.
-	lda #<(7*256+7)
-	sta z80_e
-	lda #>(7*256+7)
-	sta z80_d
-
-	; 01.04.04 add hl, de 	; point to centre of sprite.
-	jsr add_hl_de
-
-	; 04.00.xx call fpslot 	; find particle slot.
-	jsr fpslot
-
-	; 28.06.00 jr c, ptusr1 	; no, we can use it.
-	bcc :+
-	jmp ptusr1
-:
-	; 43.xx.xx rts  	; out of slots, can't generate anything.
-	rts
-
+	jsr fpslot 		; find particle slot.
+	bcs ptusr1
+	rts 			; out of slots, can't generate anything.
 ptusr1:
-	; 29.01.03 ld (ix+3), l 	; set up x.
 	lda z80_l
 	ldy #3
-	sta (z80_ix),y
+	sta (z80_ix),y 		; set up y.
 
-	; 29.01.03 ld (ix+5), h 	; set up y coordinate.
 	lda z80_h
 	ldy #5
-	sta (z80_ix),y
+	sta (z80_ix),y		; set up x coordinate.
 
-	; 17.04.00 ex af, af" 	; restore timer.
-	jsr ex_af_afs
-
-	; 29.01.03 ld (ix+1), a 	; set time on screen.
-	lda z80_a
+	lda z80_f 		; restore timer.
 	ldy #1
-	sta (z80_ix),y
+	sta (z80_ix),y		; set time on screen.
 
-	; 29.01.05 ld (ix+0), 7 	; define particle as user particle.
 	lda #7
 	ldy #0
-	sta (z80_ix),y
+	sta (z80_ix),y		; define particle as user particle.
 
-	; 27.00.xx jp chkxy 	; plot first position.
-	jmp chkxy
+	jmp chkxy		; plot first position.
 
-
-;---------------------------------------------------------
+;----------------------------------------------------
 ; Create a vertical or horizontal star.
-;---------------------------------------------------------
+;----------------------------------------------------
 
 star:
-	lda z80_i 			; store pointer to sprite.
+	lda z80_i		; store pointer to sprite.
 	pha
 	lda z80_x
 	pha
 
-	jsr fpslot 			; find particle slot.
-	bcc :+
-	jmp star7 			; found one we can use.
+	jsr fpslot 		; find particle slot.
+	bcs star7		; found one we can use.
 star0:
-	pla 				; restore sprite pointer.
+	pla 			; restore sprite pointer.
 	sta z80_x
 	pla
 	sta z80_i
-	rts  				; out of slots, can't generate anything.
+	rts 			; out of slots, can't generate anything.
 star7:
-	lda z80_c 			; direction.
-	and #3 				; is it left?
+	lda z80_c		; direction.
+	and #3 			; is it left?
 	bne :+
-	jmp star1 			; yes, it's horizontal.
+	jmp star1 		; yes, it's left.
 :
-	cmp #2				; is it right?
+	cmp #1 			; is it right?
 	bne :+
-	jmp star2 			; yes, it's horizontal.
+	jmp star2 		; yes, it's right.
 :
-	cmp #1 				; is it up?
+	cmp #2 			; is it up?
 	bne :+
-	jmp star3 			; yes, it's vertical.
+	jmp star3 		; yes, it's up.
 :
-	lda wntopx 			; get edge of screen.
-	clc
-	adc #1 				; down one pixel.
+	ldy wntopx 		; get edge of screen.
+	iny			; down one pixel.
+	tya
 star8:
 	ldy #3
-	sta (z80_ix),y			; set x coord.
-
-	jsr qrand 			; get quick random number.
+	sta (z80_ix),y 		; set y coord.
+	jsr qrand 		; get quick random number.
 star9:
 	ldy #5
-	sta (z80_ix),y 			; set y position.
+	sta (z80_ix),y		; set x position.
 
-	lda z80_c 			; direction.
-	and #3 				; zero to three.
+	lda z80_c		; direction.
+	and #3			; zero to three.
 	clc
-	adc #3 				; 3 to 6 for starfield.
+	adc #3			; 3 to 6 for starfield.
 	ldy #0
-	sta (z80_ix),y 			; define particle as star.
-
-	jsr chkxy 			; plot first position.
+	sta (z80_ix),y		; define particle as star.
+	jsr chkxy		; plot first position.
 	jmp star0
 star1:
-	; 04.00.xx call qrand 
-	jsr qrand	; get quick random number.
-
-	; 29.01.03 ld (ix+3), a
-	lda z80_a
+	jsr qrand		; get quick random number.
 	ldy #3
-	sta (z80_ix),y 	; set x coord.
+	sta (z80_ix),y 		; set y coord.
 
-	; 29.03.02 ld a, (wnrgtx)
-	lda wnrgtx 	; get edge of screen.
-	sta z80_a
-
-	; 01.03.05 add a, 15
-	lda #(15) 	; add width of sprite minus 1.
+	lda wnrgtx 		; get edge of screen.
 	clc
-	adc z80_a
-	sta z80_a
-
-	; 27.00.xx jp star9 	
+	adc #15			; add width of sprite minus 1.
 	jmp star9
-
 star2:
-	; 04.00.xx call qrand 
-	jsr qrand	; get quick random number.
-
-	; 29.01.03 ld (ix+3), a
-	lda z80_a
+	jsr qrand 		; get quick random number.
 	ldy #3
-	sta (z80_ix),y 	; set x coord.
+	sta (z80_ix),y		; set y coord.
 
-	; 29.03.02 ld a, (wnlftx)
-	lda wnlftx 	; get edge of screen.
-	sta z80_a
-
-	; 27.00.xx jp star9 	
+	lda wnlftx		; get edge of screen.
 	jmp star9
-
 star3:
-	; 29.03.02 ld a, (wnbotx)
-	lda wnbotx 	; get edge of screen.
-	sta z80_a
-
-	; 01.03.05 add a, 15
-	lda #(15) 	; height of sprite minus one pixel.
+	lda wnbotx 		; get edge of screen.
 	clc
-	adc z80_a
-	sta z80_a
-
-	; 27.00.xx jp star8 	
+	adc #15 		; height of sprite minus one pixel.
 	jmp star8
 
-
+;----------------------------------------------------
 ; Find particle slot for lasers or vapour trail.
 ; can't use alternate accumulator.
+;----------------------------------------------------
 
 fpslot:
-	; 29.04.00 ld ix, SHRAPN 	; shrapnel table.
-	lda #<(SHRAPN)
+	lda #<SHRAPN 		; shrapnel table.
 	sta z80_x
-	lda #>(SHRAPN)
+	lda #>SHRAPN
 	sta z80_i
 
-	; 29.04.00 ld de, SHRSIZ 	; size of each particle.
-	lda #<(SHRSIZ)
-	sta z80_e
-	lda #>(SHRSIZ)
-	sta z80_d
-
-	; 29.03.00 ld b, NUMSHR 	; number of pieces in table.
-	lda #NUMSHR; number of pieces in table.
+	lda #NUMSHR		; number of pieces in table.
 	sta z80_b
-
 fpslt0:
-	; 29.03.01 ld a, (ix+0) 	; get type.
 	ldy #0
-	lda (z80_ix),y
-	sta z80_a
-
-	; 47.xx.xx rla  	; is this slot in use?
-	asl z80_a
-
-	; 43.06.xx rts c 	; no, we can use it.
+	lda (z80_ix),y		; get type.
+	asl a  			; is this slot in use?
 	bcc :+
-	rts
+	rts			; no, we can use it.
 :
-	; 01.04.04 add ix, de 	; point to more shrapnel.
-	jsr add_ix_de
-
-	; 15.00.xx djnz fpslt0 	; repeat for all shrapnel.
-	dec z80_b
-	beq :+
-	jmp fpslt0
+	clc			; point to more shrapnel.
+	lda z80_x
+	adc #SHRSIZ
+	sta z80_x
+	bcc :+
+	inc z80_i
 :
-	; 43.xx.xx rts  	; out of slots, can't generate anything.
-	rts
+	dec z80_b		; repeat for all shrapnel.
+	bne fpslt0
 
+	clc
+	rts 			; out of slots, can't generate anything.
 
+;----------------------------------------------------
 ; Create an explosion at sprite position.
+;----------------------------------------------------
 
 explod:
-	; 29.03.03 ld c, a 	; particles to create.
-	lda z80_a
-	sta z80_c
+	sta z80_c 		; particles to create.
 
-	; 41.04.xx push ix 	; store pointer to sprite.
-	lda z80_i
+	lda z80_i 		; store pointer to sprite.
 	pha
 	lda z80_x
 	pha
 
-	; 29.03.01 ld l, (ix+8) 	; y coordinate.
 	ldy #8
-	lda (z80_ix),y
+	lda (z80_ix),y 		; y coordinate.
 	sta z80_l
-
-	; 29.03.01 ld h, (ix+9) 	; x coordinate.
 	ldy #9
-	lda (z80_ix),y
+	lda (z80_ix),y		; x coordinate.
 	sta z80_h
 
-	; 29.04.00 ld ix, SHRAPN 	; shrapnel table.
-	lda #<(SHRAPN)
+	lda #<SHRAPN		; shrapnel table.
 	sta z80_x
-	lda #>(SHRAPN)
+	lda #>SHRAPN
 	sta z80_i
 
-	; 29.04.00 ld de, SHRSIZ 	; size of each particle.
-	lda #<(SHRSIZ)
-	sta z80_e
-	lda #>(SHRSIZ)
-	sta z80_d
-
-	; 29.03.00 ld b, NUMSHR 	; number of pieces in table.
-	lda #NUMSHR; number of pieces in table.
-	sta z80_b
-
+	lda #NUMSHR		; number of pieces in table.
+	sta explcnt
 expld0:
-	; 29.03.01 ld a, (ix+0) 	; get type.
 	ldy #0
-	lda (z80_ix),y
-	sta z80_a
-
-	; 47.xx.xx rla  	; is this slot in use?
-	asl z80_a
-
-	; 28.06.00 jr c, expld1 	; no, we can use it.
-	bcc :+
-	jmp expld1
-:
+	lda (z80_ix),y		; get type.
+	asl a 			; is this slot in use?
+	bcs expld1		; no, we can use it.
 expld2:
-	; 01.04.04 add ix, de 	; point to more shrapnel.
-	jsr add_ix_de
-
-	; 15.00.xx djnz expld0 	; repeat for all shrapnel.
-	dec z80_b
-	beq :+
-	jmp expld0
+	clc
+	lda z80_x
+	adc #SHRSIZ
+	sta z80_x
+	bcc :+
+	inc z80_i
 :
+	dec explcnt		; repeat for all shrapnel.
+	bne expld0
 expld3:
-	; 40.04.xx pop ix 	; restore sprite pointer.
-	pla
+	pla			; restore sprite pointer.
 	sta z80_x
 	pla
 	sta z80_i
-
-	; 43.xx.xx rts  	; out of slots, can't generate any more.
-	rts
+	rts 			; out of slots, can't generate any more.
 
 expld1:
-	; 29.03.03 ld a, c 	; shrapnel counter.
-	lda z80_c
-	sta z80_a
-
-	; 02.05.xx and 15 	; 0 to 15.
-	lda z80_a
-	and #15
-
-	; 01.03.03 add a, l 	; add to x.
-	lda z80_a
-	clc
+	lda z80_c		; shrapnel counter.
+	and #15			; 0 to 15.
+	clc			; add to x.
 	adc z80_l
-	sta z80_a
-
-	; 29.01.03 ld (ix+3), a 	; x coord.
-	lda z80_a
 	ldy #3
-	sta (z80_ix),y
+	sta (z80_ix),y		; y coord.
 
-	; 29.03.02 ld a, (seed3) 	; crap random number.
-	lda seed3
-	sta z80_a
-
-	; 02.05.xx and 15 	; 0 to 15.
-	lda z80_a
-	and #15
-
-	; 01.03.03 add a, h 	; add to y.
-	lda z80_a
-	clc
+	lda seed3 		; crap random number.
+	and #15			; 0 to 15.
+	clc 			; add to y.
 	adc z80_h
-	sta z80_a
-
-	; 29.01.03 ld (ix+5), a 	; y coord.
-	lda z80_a
 	ldy #5
-	sta (z80_ix),y
+	sta (z80_ix),y		; x coord.
 
-	; 29.01.05 ld (ix+0), 2 	; switch it on.
 	lda #2
 	ldy #0
-	sta (z80_ix),y
+	sta (z80_ix),y		; switch it on.
 
-	; 18.xx.xx exx  	; store coordinates.
-	jsr exx
-
-	; 04.00.xx call chkxy 	; plot first position.
-	jsr chkxy
-
-	; 04.00.xx call qrand 	; quick random angle.
-	jsr qrand
-
-	; 02.05.xx and 60 	; keep within range.
-	lda z80_a
-	and #60
-
-	; 29.01.03 ld (ix+1), a 	; angle.
-	lda z80_a
+;	jsr exx 		; store coordinates.
+	jsr chkxy		; plot first position.
+	jsr qrand		; quick random angle.
+	and #60 		; keep within range.
 	ldy #1
-	sta (z80_ix),y
+	sta (z80_ix),y		; angle.
+;	jsr exx			; restore coordinates.
 
-	; 18.xx.xx exx  	; restore coordinates.
-	jsr exx
+	dec z80_c		; one less piece of shrapnel to generate.
+	bne expld2 		; back to main explosion loop.
+	jmp expld3 		; restore sprite pointer and exit.
 
-	; 13.03.xx dec c 	; one less piece of shrapnel to generate.
-	dec z80_c
+explcnt:	.byte 0
 
-	; 28.06.00 jr nz, expld2 	; back to main explosion loop.
-	beq :+
-	jmp expld2
-:
-	; 28.00.xx jr expld3 	; restore sprite pointer and exit.
-	jmp expld3
+;----------------------------------------------------
+; Quick random
+;----------------------------------------------------
 
 qrand:
-	; 29.03.02 ld a, (seed3) 	; random seed.
-	lda seed3
-	sta z80_a
-
-	; 29.03.03 ld l, a 	; low byte.
-	lda z80_a
-	sta z80_l
-
-	; 29.03.05 ld h, 0 	; no high byte.
-	lda #0; no high byte.
-	sta z80_h
-
-	; 29.03.03 ld a, r 	; r register.
-	lda z80_r
-	sta z80_a
-
-	; 64.01.xx xor (hl) 	; combine with seed.
-	lda z80_a
-	ldy #0
-	eor (z80_hl),y
-	sta z80_a
-
-	; 29.02.03 ld (seed3), a 	; new seed.
-	lda z80_a
-	sta seed3
-
-	; 43.xx.xx rts  	
+	jsr random		; r register.
+	eor seed3		; combine with seed.
+	sta seed3 		; new seed.
 	rts
 
-	; 98.00.00 seed3  .byte 0
 seed3:	.byte 0
 
-
+;----------------------------------------------------
 ; Display all shrapnel.
+;----------------------------------------------------
 
 dshrp:
-	rts
-	; 29.04.00 ld hl, plotde 	; display routine.
-	lda #<(plotde)
-	sta z80_l
-	lda #>(plotde)
-	sta z80_h
-
-	; 29.02.04 ld (proshx+1), hl 	; modify routine.
-	lda z80_l
+	lda #<plotde		; display routine.
 	sta proshx+1
-	lda z80_h
-	sta proshx+1+1
+	lda #>plotde
+	sta proshx+2
+	jsr proshr		; process shrapnel.
 
-	; 04.00.xx call proshr 	; process shrapnel.
-	jsr proshr
-
-	; 29.04.00 ld hl, prosh1 	; processing routine.
-	lda #<(prosh1)
-	sta z80_l
-	lda #>(prosh1)
-	sta z80_h
-
-	; 29.02.04 ld (proshx+1), hl 	; modify the call.
-	lda z80_l
+	lda #<prosh1		; processing routine.
 	sta proshx+1
-	lda z80_h
-	sta proshx+1+1
-
-	; 43.xx.xx rts  	
+	lda #>prosh1
+	sta proshx+2
 	rts
-;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 ;------------------------------------------------------
 ; Particle engine.
 ;
 ; Init particle data for 55 particles in SHRAPN table.
 ; Every particle has 6 bytes.
+;
+; global:	-
+; local:	x,y,hl
+; calls:	-
 ;------------------------------------------------------
 
 inishr:
-	lda #<SHRAPN 			; table.
+	lda #<SHRAPN 		; table.
 	sta z80_l
 	lda #>SHRAPN
 	sta z80_h
 
 	ldy #0
-	ldx #NUMSHR			; shrapnel pieces to process.
+	ldx #NUMSHR		; shrapnel pieces to process.
 inish0:
-	lda #255 			; kill the shrapnel.
+	lda #255 		; kill the shrapnel.
 	sta (z80_hl),y
 
-	clc 				; point there.
+	clc 			; point there.
 	lda z80_l
-	adc #SHRSIZ		 	; distance to next.
+	adc #SHRSIZ		; distance to next.
 	sta z80_l
 	bcc :+
 	inc z80_h
 :
 	dex
-	bne inish0 			; round again.
+	bne inish0 		; round again.
 	rts
 
-
-;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;------------------------------------------------------
 ; Check for collision between laser and sprite.
+;------------------------------------------------------
 
 lcol:
-	; 29.04.00 ld hl, SHRAPN 	; shrapnel table.
-	lda #<(SHRAPN)
+	lda #<SHRAPN		; shrapnel table.
 	sta z80_l
-	lda #>(SHRAPN)
+	lda #>SHRAPN
 	sta z80_h
 
-	; 29.04.00 ld de, SHRSIZ 	; size of each particle.
-	lda #<(SHRSIZ)
-	sta z80_e
-	lda #>(SHRSIZ)
-	sta z80_d
-
-	; 29.03.00 ld b, NUMSHR 	; number of pieces in table.
-	lda #NUMSHR; number of pieces in table.
+	lda #NUMSHR		; number of pieces in table.
 	sta z80_b
-
 lcol0:
-	; 29.03.01 ld a, (hl) 	; get type.
 	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 02.03.xx and a 	; is this slot a laser?
-	lda z80_a
-	and z80_a
-
-	; 28.06.00 jr z, lcol1 	; yes, check collision.
-	bne :+
-	jmp lcol1
-:
+	lda (z80_hl),y 		; get type.
+	beq lcol1		; yes, check collision.
 lcol3:
-	; 01.04.04 add hl, de 	; point to more shrapnel.
-	jsr add_hl_de
-
-	; 15.00.xx djnz lcol0 	; repeat for all shrapnel.
-	dec z80_b
-	beq :+
-	jmp lcol0
-:
-	; 43.xx.xx rts  	; no collision, carry not set.
-	rts
-
-lcol1:
-	; 41.04.xx push hl 	; store pointer to laser.
-	lda z80_h
-	pha
+	clc			; point to more shrapnel.
 	lda z80_l
-	pha
-
-	; 22.04.xx inc hl 	; direction.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 22.04.xx inc hl 	; not used.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 22.04.xx inc hl 	; x position.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 29.03.01 ld a, (hl) 	; get x.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 63.01.xx sub (ix+X) 	; subtract sprite x.
-	sec
-	ldy #var_X
-	lda z80_a
-	sbc (z80_ix),y
-	sta z80_a
-
-lcolh:
-	; 06.05.xx cp 16 	; within range?
-	lda z80_a
-	cmp #16
-
-	; 28.06.00 jr nc, lcol2 	; no, missed.
-	bcs :+
-	jmp lcol2
-:
-	; 22.04.xx inc hl 	; not used.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 22.04.xx inc hl 	; y position.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 29.03.01 ld a, (hl) 	; get y.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 63.01.xx sub (ix+Y) 	; subtract sprite y.
-	sec
-	ldy #var_Y
-	lda z80_a
-	sbc (z80_ix),y
-	sta z80_a
-
-	; 06.05.xx cp 16 	; within range?
-	lda z80_a
-	cmp #16
-
-	; 28.06.00 jr c, lcol4 	; yes, collision occurred.
+	adc #SHRSIZ
+	sta z80_l
 	bcc :+
-	jmp lcol4
+	inc z80_h
+:
+	dec z80_b		; repeat for all shrapnel.
+	bne lcol0
+	rts 			; no collision, carry not set.
+lcol1:
+	ldy #3
+	lda (z80_hl),y		; get y.
+	sec
+	ldy #8
+	sbc (z80_ix),y		; subtract sprite y.
+lcolh:
+	cmp #16 		; within range?
+	bcc :+
+	jmp lcol2		; no, missed.
+:
+	ldy #5
+	lda (z80_hl),y 		; get x.
+	sec
+	ldy #9
+	sbc (z80_ix),y 		; subtract sprite y.
+	cmp #16			; within range?
+	bcs :+
+	jmp lcol4 		; yes, collision occurred.
 :
 lcol2:
-	; 40.04.xx pop hl 	; restore laser pointer from stack.
-	pla
-	sta z80_l
-	pla
-	sta z80_h
-
-	; 28.00.xx jr lcol3 	
 	jmp lcol3
-
 lcol4:
-	; 40.04.xx pop hl 	; restore laser pointer.
-	pla
-	sta z80_l
-	pla
-	sta z80_h
-
-	; 43.xx.xx rts  	; return with carry set for collision.
-	rts
-;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+	sec
+	rts 			; return with carry set for collision.
+.endif
 
 ;------------------------------------------------------
 ; Main game engine code starts here.
@@ -2726,12 +2212,15 @@ setsa0:
 	lda scraddr
 	sta SCADTB_lb,y		; write low byte.
 	lda scraddr+1
+	cpy #192		; vertical lines on screen.
+	bcc :+
+	ora #40
+:
 	sta SCADTB_hb,y		; write high byte.
 	jsr nline		; next line down.
 	iny			; next position in table.
-	cpy #192		; vertical lines on screen.
 	bne setsa0
-
+	
 ; Init graphics mode
 
 	lda #ScrMode		; graphics mode
@@ -2740,7 +2229,9 @@ setsa0:
 
 	jsr setpal 		; set up palette.
 rpblc2:
+.if pflag
 	jsr inishr 		; initialise particle engine.
+.endif
 evintr:
 	jsr evnt12 		; call intro/menu event.
 
@@ -2801,7 +2292,9 @@ rstrt0:
 	sta deadf 		; reset dead flag.
 	jsr droom 		; show screen layout.
 rpblc0:
+.if pflag
 	jsr inishr 		; initialise particle engine.
+.endif
 	jsr shwob		; draw objects.
 
 	lda #<sprtab 		; address of sprite table, even sprites.
@@ -2824,7 +2317,8 @@ mloop:
 	sta z80_i
 	jsr dspr 		; display even sprites.
 
-;	jsr plsnd 		; play sounds.
+;
+	jsr plsnd 		; play sounds.
 	jsr vsync 		; synchronise with display.
 
 	lda #<(sprtab+TABSIZ) 	; address of first odd sprite.
@@ -2870,6 +2364,7 @@ bsortx:
 
 ; back to start of main loop.
 
+	inc clock
 	jmp mloop		; switched to a jmp mloop during test mode.
 
 ;----------------------------------------------------------
@@ -2962,6 +2457,9 @@ evrs:
 num2ch:
 	sta z80_d		; Save number
 
+	lda #0
+	sta flag
+
 	ldx #100		; hundreds column.
 	stx z80_e
 	jsr numdg		; show digit.
@@ -2970,6 +2468,7 @@ num2ch:
 	stx z80_e
 	jsr numdg		; show digit.
 
+	inc flag
 	ldx #1			; units column.
 	stx z80_e
 numdg:
@@ -2984,16 +2483,21 @@ numdg1:
 	sbc z80_e		; subtract from column.
 	sta z80_d
 	inc z80_a		; increment digit.
+	inc flag
 	jmp numdg1		; repeat until column is zero.
 numdg0:
 	ldy #0
 	lda z80_a
 	sta (z80_bc),y		; write digit to buffer.
+	lda flag
+	beq :+
 	inc z80_c		; next buffer position.
 	bne :+
 	inc z80_b
 :
 	rts
+
+flag:	.byte 0
 
 ;---------------------------------------------------------
 ; Reset score to "000000"
@@ -3017,7 +2521,7 @@ inisc0:
 ;  D = second number
 ;
 ; Output:
-;  HL = result H x D
+;  L = result H x D
 ;-----------------------------------------------------
 
 imul:
@@ -3033,7 +2537,8 @@ imul0:
 	lda z80_h
 	sta z80_d		; zeroise high byte.
 
-	ldx #8			; repeat 8 times.
+	lda #8			; repeat 8 times.
+	sta z80_b
 imul1:
 	lsr z80_c		; rotate rightmost bit into carry.
 	bcc imul2		; wasn't set.
@@ -3048,7 +2553,7 @@ imul1:
 imul2:
 	asl z80_e 		; shift de 1 bit left.
 	rol z80_d
-	dex
+	dec z80_b
 	bne imul1		; repeat 8 times.
 
 	rts
@@ -3066,9 +2571,8 @@ imul2:
 ;-----------------------------------------------
 
 idiv:
-	lda #8		 	; bits to shift.
-	sta z80_b
 	lda #0
+	ldy #8		 	; bits to shift.
 	asl z80_d
 idiv0:
 	rol a 			; multiply d by 2.
@@ -3077,7 +2581,7 @@ idiv0:
 	sbc z80_e		; subtract it.
 idiv1:
 	rol z80_d		; rotate into d.
-	dec z80_b
+	dey
 	bne idiv0		; repeat
 	rts
 
@@ -3783,7 +3287,8 @@ shwob:
 	lda #>objdta
 	sta z80_h
 
-	ldx numob 			; number of objects in the game.
+	lda numob 			; number of objects in the game.
+	sta sprcnt
 shwob0:
 	ldy #32 			; distance to room number.
 	lda (z80_hl),y 			; same as an item?
@@ -3798,7 +3303,7 @@ shwob0:
 	lda z80_h
 	adc #0
 	sta z80_h	 		; point to it.
-	dex
+	dec sprcnt
 	bne shwob0 			; repeat for others.
 	rts
 
@@ -3989,7 +3494,7 @@ getob0:
 
 ;-----------------------------------------------------------------
 ; Got object check.
-; Call with object in accumulator, rtsurns zero set if in pockets.
+; Call with object in accumulator, returns zero set if in pockets.
 ;
 ; Input:
 ;  A = object number
@@ -4002,7 +3507,6 @@ gotob:
 :
 	jsr findob		; find the object.
 gotob1:
-;	cmp #255 		; in pockets?
 	rts
 
 gotob0:
@@ -4139,7 +3643,8 @@ spawn:
 	lda #>sprtab
 	sta z80_h
 numsp1:
-	ldx #NUMSPR		; number of sprites.
+	lda #NUMSPR		; number of sprites.
+	sta spcnt
 spaw0:
 	ldy #0
 	lda (z80_hl),y		; get sprite type.
@@ -4153,7 +3658,7 @@ spaw0:
 	bcc :+
 	inc z80_h
 :
-	dex			; one less iteration.
+	dec spcnt		; one less iteration.
 	bne spaw0		; keep going until we find a slot.
 
 ; Didn't find one but drop through and set up a dummy sprite instead.
@@ -4187,14 +3692,14 @@ spaw1:
 	ldy #7
 	sta (z80_hl),y		; copy
 
-	ldy #9
+	ldy #8
 	lda (z80_ix),y 		; x coordinate.
 	ldy #3
 	sta (z80_hl),y		; set sprite coordinate.
 	ldy #8
 	sta (z80_hl),y		; copy
 
-	ldy #8
+	ldy #9
 	lda (z80_ix),y 		; y coordinate.
 	ldy #4
 	sta (z80_hl),y		; set sprite coordinate.
@@ -4205,7 +3710,7 @@ spaw1:
 	lda (z80_ix),y
 	sta (z80_hl),y		; direction
 
-	lda z80_b
+	lda #0
 	ldy #11
 	sta (z80_hl),y		; reset parameter.
 	iny
@@ -4235,6 +3740,7 @@ evis1:
 
 	rts
 
+spcnt:	.byte 0
 spptr:	.word 0			; spawned sprite pointer.
 seed:	.byte 0			; seed for random numbers.
 score:	.byte "000000"		; player"s score.
@@ -4574,7 +4080,7 @@ pchar0:
 	bpl pchar0		; repeat.
 	rts
 
-scrtab:	.byte $e0,$c0,$a0,$80,$60,$40,$20,$00
+scrtab:		.byte $e0,$c0,$a0,$80,$60,$40,$20,$00
 
 ;----------------------------------------------
 ; Print attributes, properties and pixels.
@@ -4618,6 +4124,7 @@ panp:
 panp0:
 	ldy #0
 	lda (tileaddr),y 	; get image byte.
+	eor #TxtInvert		; Invert
 	ldy scrtab,x
 	sta (scraddr),y 	; copy to screen.
 	inc tileaddr 		; next image byte.
@@ -5174,9 +4681,10 @@ tded:
 	lda (z80_ix),y 		; x coordinate.
 	sta dispx		; coords in dispx,dispy.
 	jsr tstbl		; get map address.
-
-	ldx #31			; default distance to next line down.
-	stx z80_e
+	pha
+	lda #31			; default distance to next line down.
+	sta z80_e
+	pla
 	cmp z80_b		; is this the required block?
 	bne :+
 	rts			; yes.
@@ -5258,7 +4766,7 @@ tded1:
 	adc z80_e
 	sta bufaddr
 	bcc :+
-	inc z80_h
+	inc bufaddr+1
 :
 	ldy #0
 	lda (bufaddr),y 	; fetch left cell block.
@@ -5571,9 +5079,7 @@ dmsg3:
 	jsr preprt		; pre-printing stuff.
 	jsr checkx		; make sure we"re in a printable range.
 	lda prtmod		; print mode.
-	beq :+			; standard size?
-	jmp bmsg1		; no, double-height text.
-:
+	bne bmsg1		; no, double-height text.
 dmsg0:
 	lda z80_h		; store string pointer.
 	pha
@@ -5584,13 +5090,9 @@ dmsg0:
 	lda (z80_hl),y		; fetch byte to display.
 	and #127		; remove any end marker.
 	cmp #13
-	bne :+
-	lda #0
-	sta dispx
-	jmp dmsg4 
-:	jsr pchar		; display character.
+	beq dmsg1
+	jsr pchar		; display character.
 	jsr nexpos 		; display position.
-dmsg4:
 	bne dmsg2		; not on a new line.
 	jsr nexlin		; next line down.
 dmsg2:
@@ -5610,6 +5112,17 @@ dmsg2:
 	inc z80_h
 :
 	jmp dmsg0
+dmsg1:
+	inc dispy
+	lda dispy
+	cmp #24
+	bcc dmsg4
+	lda #0
+	sta dispy
+dmsg4:
+	lda #0
+	sta dispx
+	jmp dmsg2
 
 prtmod:	.byte 0            	; print mode, 0 = standard, 1 = double-height.
 
@@ -5624,7 +5137,10 @@ bmsg1:
 	ldy #0
 	lda (z80_hl),y 		; get character to display.
 	and #127		; only want 7 bits.
+	cmp #13
+	beq bmsg2
 	jsr bchar 		; display big char.
+bmsg3:
 	ldy #0
 	lda (z80_hl),y 		; look at last character.
 	pha
@@ -5637,7 +5153,17 @@ bmsg1:
 	bcc bmsg1		; no, keep going.
 :
 	rts
-
+bmsg2:
+	lda #0
+	sta dispx
+	inc dispy
+	inc dispy
+	lda dispy
+	cmp #23
+	bcc bmsg3
+	lda #0
+	sta dispy
+	jmp bmsg3
 
 ;----------------------------------------------------------
 ; Big character display.
@@ -5694,6 +5220,7 @@ bchar0:
 	jsr nexpos		; display position.
 	bne bchar2 		; not on a new line.
 bchar3:
+	inc dispy
 	jsr nexlin 		; next line check.
 bchar2:
 	jmp dscor2		; tidy up line and column variables.
@@ -5727,12 +5254,7 @@ achar:
 nexpos:
 	inc dispx		; move along one position.
 	lda dispx 		; get coordinate.
-	cmp #32
-	bcc :+
-;	inc dispy
-	lda #0			; reached edge of screen?
-	sta dispx		; set new position.
-:
+	and #31
 	rts 			; return with status in zero flag.
 
 ;-------------------------------------------------
@@ -5799,7 +5321,8 @@ getwd0:
 ;-----------------------------------------------------------
 
 bsort:
-	ldx #NUMSPR - 1		; sprites to swap.
+	lda #NUMSPR - 1		; sprites to swap.
+	sta qscnt
 
 	lda #<sprtab 		; sprite table.
 	sta z80_x
@@ -5829,9 +5352,12 @@ bsort2:
 	bcc :+
 	inc z80_i
 :
-	dex 
+	dec qscnt 
 	bne bsort0		; repeat for remaining sprites.
 	rts
+
+qscnt:	.byte 0
+
 bsort1:
 	ldy #TABSIZ
 	lda (z80_ix),y		; sprite on/off flag.
@@ -6177,6 +5703,10 @@ gspra0:
 
 scadd:
 	ldx dispy
+	cpx #192
+	bcc :+
+	ldx #192
+:
 	lda dispx
 	lsr a
 	lsr a
@@ -6201,12 +5731,15 @@ spmask:	.byte 255,0,63,192,15,240,3,252
 sspria:
 	jsr gsprad		; get old sprite address.
 sspri2:
-	ldx #16			; vertical lines.
+	lda #16			; vertical lines.
+	sta acnt
 sspri0:
 	jsr dline		; draw a line.
-	dex
+	dec acnt
 	bne sspri0		; repeat 16 times
 	rts
+
+acnt = $7b
 
 ;-----------------------------------------------------------------
 
@@ -6216,18 +5749,21 @@ ssprib:
 
 ;-----------------------------------------------------------------
 
+ccnt = $7c
+
 sspric:
 	jsr gsprad 		; get old sprite address.
 	jsr exx  		; store addresses.
 	jsr gspran 		; get new sprite addresses.
 
-	ldx #15
+	lda #15
+	sta ccnt
 lloop:
 	jsr dline 		; draw a line.
 	jsr exx  		; restore old addresses.
 	jsr dline 		; delete a line.
 	jsr exx  		; flip to new sprite addresses.
-	dex
+	dec ccnt
 	bne lloop
 
 	jsr dline		; draw a line.
@@ -6611,12 +6147,14 @@ init_end:
 ;----------------------------------------------------------------
 
 tstsc:
-	sta z80_b
+	sta tmproom
 	clc
 	adc #MAPWID 			; add width in case we"re negative.
 	tax 				; add displacement to map data.
 	lda mapdat-MAPWID,x 		; find room number there.
 	rts
+
+tmproom:	.byte 0
 
 ;--------------------------
 ; Screen left.
@@ -6632,7 +6170,7 @@ scrl0:
 	bne :+
 	rts				; no, return to loop.
 :
-	lda z80_b			; restore room displacement.
+	lda tmproom			; restore room displacement.
 	sta roomtb			; new room table position.
 scrl1:
 	jsr initsc 			; set new screen.
@@ -6908,7 +6446,7 @@ sprls0:
 
 nspr:
 	lda #NUMSPR			; sprite slots in table.
-	sta z80_b
+	sta sprcnt
 	lda #<sprtab 			; sprite table.
 	sta z80_x
 	lda #>sprtab
@@ -6931,7 +6469,7 @@ nspr0:
 	bcc :+
 	inc z80_i
 :
-	dec z80_b	 			; one less space in the table.
+	dec sprcnt	 			; one less space in the table.
 	bne nspr0
 	rts
 nspr1:
@@ -6946,7 +6484,7 @@ nspr1:
 	bcc :+
 	inc z80_i
 :
-	dec z80_b	 			; one less to do.
+	dec sprcnt	 			; one less to do.
 	bne nspr2
 	rts
 nspr2:
@@ -6963,7 +6501,7 @@ nspr2:
 	bcc :+
 	inc z80_i
 :
-	dec z80_b	 			; one less space in table.
+	dec sprcnt	 			; one less space in table.
 	bne nspr2
 	rts
 
@@ -6977,7 +6515,8 @@ nspr2:
 ;----------------------------------------------------------
 
 ispr:
-	ldx #NUMSPR			; sprite slots in table.
+	lda #NUMSPR			; sprite slots in table.
+	sta sprcnt
 	lda #<sprtab			; sprite table.
 	sta z80_x
 	lda #>sprtab
@@ -7007,12 +6546,12 @@ ispr4:
 	bcc :+
 	inc z80_i
 :
-	dex
+	dec sprcnt
 	bne ispr1 			; repeat for remaining sprites.
 	rts  				; no more room in table.
 ispr3:
 	jsr cpsp			; initialise a sprite.
-	dex				; one less space in the table.
+	dec sprcnt			; one less space in the table.
 	bne ispr2
 	rts
 
@@ -7140,7 +6679,25 @@ cpsp:
 	ldy #16
 	sta (z80_ix),y
 evis0:
+	lda z80_i
+	pha
+	lda z80_x
+	pha
+	lda z80_h
+	pha
+	lda z80_l
+	pha
+
 	jsr evnt09 			; perform event.
+
+	pla
+	sta z80_l
+	pla
+	sta z80_h
+	pla
+	sta z80_x
+	pla
+	sta z80_i
 
 	clc
 	lda z80_x 			; distance to next odd/even entry.
@@ -7195,380 +6752,178 @@ clw1:
 	rts
 
 
+;----------------------------------------------------------
 ; Effects code.
 ; Ticker routine is called 25 times per second.
+;
+; HL = txtscr = left text screen address
+; DE = txtscr+txtwid-1 = right text screen address
+; BC = txtpos = text scroller position
+;
+;----------------------------------------------------------
+scr_l	= $90
+scr_r	= $92
+scr_txt	= $94
 
+.if sflag
 scrly:
-	; 43.xx.xx rts  	
 	rts
+	.word txtscr         	; get left screen address.
+	sta scr_l
+	lda txtscr+1
+	sta scr_l+1
+	sta scr_r+1
+	
+	stx xtmp
 
-	; 98.00.01 .word txtscr         ; get screen address.
-	.word txtscr         ; get screen address.
-
-	; 29.03.05 ld b, 8 	; 8 pixel rows.
-	lda #8; 8 pixel rows.
-	sta z80_b
-
-	; 41.04.xx push hl 	; store screen address.
-	lda z80_h
-	pha
-	lda z80_l
-	pha
-
+	clc         		; get right screen address.
+	lda scr_l
+	adc txtwid
+	sta scr_r
+	dec scr_r
 scrly1:
-	; 41.04.xx push bc 	; store rows on stack.
-	lda z80_b
-	pha
-	lda z80_c
-	pha
-
-	; 41.04.xx push hl 	
-	lda z80_h
-	pha
-	lda z80_l
-	pha
-
-	; 29.03.02 ld a, (txtwid) 	; characters wide.
-	lda txtwid
-	sta z80_a
-
-	; 29.03.03 ld b, a 	; put into the loop counter.
-	lda z80_a
-	sta z80_b
-
-	; 02.03.xx and a 	; reset carry flag.
-	lda z80_a
-	and z80_a
-
-scrly0:
-	; 46.01.xx rl (hl) 	; rotate left.
-	ldy #0
-	lda (z80_hl),y
-	rol a
-	sta (z80_hl),y
-
-	; 13.03.xx dec l 	; char left.
-	dec z80_l
-
-	; 15.00.xx djnz scrly0 	; repeat for width of ticker message.
-	dec z80_b
-	beq :+
-	jmp scrly0
-:
-	; 40.04.xx pop hl 	
-	pla
-	sta z80_l
-	pla
-	sta z80_h
-
-	; 22.03.xx inc h 	; next row down.
-	inc z80_h
-
-	; 40.04.xx pop bc 	; retrieve row counter from stack.
-	pla
-	sta z80_c
-	pla
-	sta z80_b
-
-	; 15.00.xx djnz scrly1 	; repeat for all rows.
-	dec z80_b
-	beq :+
-	jmp scrly1
-:
-	; 29.04.02 ld hl, (txtpos) 	; get text pointer.
-	lda txtpos
-	sta z80_l
-	lda txtpos+1
-	sta z80_h
-
-	; 29.03.01 ld a, (hl) 	; find character we"re displaying.
-	ldy #0
-	lda (z80_hl),y
-	sta z80_a
-
-	; 02.05.xx and 127 	; remove end marker bit if applicable.
-	lda z80_a
-	and #127
-
-	; 06.05.xx cp 13 	; is it newline?
-	lda z80_a
-	cmp #13
-
-	; 28.06.00 jr nz, scrly5 	; no, it's okay.
-	beq :+
-	jmp scrly5
-:
-	; 29.03.05 ld a, 32 	; convert to a space instead.
-	lda #32; convert to a space instead.
-	sta z80_a
-
-scrly5:
-	; 49.xx.xx rlca  	
-	rol z80_a
-
-	; 49.xx.xx rlca  	
-	rol z80_a
-
-	; 49.xx.xx rlca  	; multiply by 8 to find char.
-	rol z80_a
-
-	; 29.03.03 ld b, a 	; store shift in b.
-	lda z80_a
-	sta z80_b
-
-	; 02.05.xx and 3 	; keep within 768-byte range of font.
-	lda z80_a
-	and #3
-
-	; 29.03.03 ld d, a 	; that's our high byte.
-	lda z80_a
-	sta z80_d
-
-	; 29.03.03 ld a, b 	; restore the shift.
-	lda z80_b
-	sta z80_a
-
-	; 02.05.xx and 248 	
-	lda z80_a
-	and #248
-
-	; 29.03.03 ld e, a 	
-	lda z80_a
-	sta z80_e
-
-	; 29.04.02 ld hl, (23606) 	; font address.
-	lda FontPtr
-	sta z80_l
-	lda FontPtr+1
-	sta z80_h
-
-	; 01.04.04 add hl, de 	; point to image of character.
-	jsr add_hl_de
-
-	; 17.04.04 ex de, hl 	; need the address in de.
-	jsr ex_de_hl
-
-	; 40.04.xx pop hl 	
-	pla
-	sta z80_l
-	pla
-	sta z80_h
-
-	; 29.03.02 ld a, (txtbit) 	
-	lda txtbit
-	sta z80_a
-
-	; 29.03.03 ld c, a 	
-	lda z80_a
-	sta z80_c
-
-	; 29.03.05 ld b, 8 	
-	lda #8
-	sta z80_b
-
-scrly3:
-	; 29.03.01 ld a, (de) 	; get image of char line.
-	ldy #0
-	lda (z80_de),y
-	sta z80_a
-
-	; 02.03.xx and c 	; test relevant bit of char.
-	lda z80_a
-	and z80_c
-
-	; 28.06.00 jr z, scrly2 	; not set - skip.
-	bne :+
-	jmp scrly2
-:
-	; 22.01.xx inc (hl) 	; set bit.
-	ldy #0
-	lda (z80_hl),y
+	ldy txtwid		; set txtwide
+	dey
 	clc
-	adc #1
-	sta (z80_hl),y
+scrly0:
+	lda (scr_l),y		; scroll 1 line
+	rol a
+	sta (scr_l),y
+	dey
+	bpl scrly0
 
-scrly2:
-	; 22.03.xx inc h 	; next line of window.
-	inc z80_h
+	clc			; point to next line
+	lda scr_l
+	adc #32
+	sta scr_l
+	bcc scrly1		; repeat 8 times
 
-	; 22.04.xx inc de 	; next line of char.
-	inc z80_e
-	bne :+
-	inc z80_d
-:
-	; 15.00.xx djnz scrly3 	
-	dec z80_b
-	beq :+
-	jmp scrly3
-:
-	; 29.04.00 ld hl, txtbit 	; bit of text to display.
-	lda #<(txtbit)
-	sta z80_l
-	lda #>(txtbit)
-	sta z80_h
-
-	; 53.01.xx rrc (hl) 	; next bit of char to use.
-	ldy #0
-	lda (z80_hl),y
-	ror a
-	sta (z80_hl),y
-
-	; 43.06.xx rts nc 	; not reached end of character yet.
-	bcs :+
-	rts
-:
-	; 29.04.02 ld hl, (txtpos) 	; text pointer.
-	lda txtpos
-	sta z80_l
+	lda txtpos 		; get text pointer.
+	sta scr_txt
 	lda txtpos+1
-	sta z80_h
+	sta scr_txt+1
 
-	; 29.03.01 ld a, (hl) 	; what was the character?
 	ldy #0
-	lda (z80_hl),y
-	sta z80_a
+	lda (scr_txt),y 		; find character we're displaying.
+	and #127 		; remove end marker bit if applicable.
+	cmp #13			; is it newline?
+	bne scrly5 		; no, it's okay.
+	lda #32			; convert to a space instead.
+scrly5:
+	sta fntaddr		; calculate char address
+	lda #0
+	sta fntaddr+1
+	asl fntaddr  		; multiply char by 8.
+	rol fntaddr+1
+	asl fntaddr
+	rol fntaddr+1
+	asl fntaddr
+	rol fntaddr+1
+	lda fntaddr
+	clc
+	adc FontPtr
+	sta scrly3+1		; that's the low byte.
+	lda fntaddr+1
+	adc FontPtr+1
+	sta scrly3+2		; add displacement.
 
-	; 22.04.xx inc hl 	; next character in message.
-	inc z80_l
-	bne :+
-	inc z80_h
-:
-	; 47.xx.xx rla  	; end of message?
-	asl z80_a
+	ldx #0
+scrly3:
+	lda $3333,x		; get image of char line.
+	and txtbit
+	beq scrly2		; don't plot pixel
+	ldy scrline,x
+	lda (scr_r),y
+	clc
+	ora #1
+	sta (scr_r),y		; plot pixel
+scrly2:
+	inx			; next line of char.
+	cpx #8
+	bne scrly3
 
-
-; rts nc              ; not yet, exit here.
-; ld a,201            ; code for rts.
-; ld (scrly),a        ; disable scrolling routine.
-
-	; 28.06.00 jr nc, scrly6 	; not yet - continue.
+	lsr txtbit		; bit of text to display.
 	bcs :+
-	jmp scrly6
-:
-scrly4:
-	; 29.04.02 ld hl, (txtini) 	; start of scrolling message.
-	lda txtini
-	sta z80_l
-	lda txtini+1
-	sta z80_h
-
-scrly6:
-	; 29.02.04 ld (txtpos), hl 	; new text pointer position.
-	lda z80_l
-	sta txtpos
-	lda z80_h
-	sta txtpos+1
-
-	; 43.xx.xx rts  	
 	rts
+:
+	ldy #0
+	lda (scr_txt),y 	; what was the character?
+	asl a	  		; end of message?
+	bcs scrly4
+	inc txtpos
+	bne :+
+	inc txtpos+1
+:
+	jmp scrly6 		; not yet - continue.
+scrly4:
+	lda txtini 		; start of scrolling message.
+	sta txtpos
+	lda txtini+1
+	sta txtpos+1
+scrly6:
+	lda #128
+	sta txtbit
+	ldx xtmp
+	rts
+
+scrline:	.byte $00,$20,$40,$60,$80,$a0,$c0,$e0
+
+;-------------------------------------------------------
+; Entry TICKER command
+;
+; Entry:
+;  z80_b = message nr
+;  z80_c = width
+;-------------------------------------------------------
 
 iscrly:
-	; 04.00.xx call prescr 	; set up display position.
-	jsr prescr
+	jsr prescr 		; set up display position.
 
-	; 29.04.00 ld hl, msgdat 	; text messages.
-	lda #<(msgdat)
+	lda #<msgdat 		; text messages.
 	sta z80_l
-	lda #>(msgdat)
+	lda #>msgdat
 	sta z80_h
 
-	; 29.03.03 ld a, b 	; width.
-	lda z80_b
-	sta z80_a
-
-	; 13.03.xx dec a 	; subtract one.
-	dec z80_a
-
-	; 06.05.xx cp 32 	; is it between 1 and 32?
-	lda z80_a
-	cmp #32
-
-	; 28.06.00 jr nc, iscrl0 	; no, disable messages.
-	bcs :+
-	jmp iscrl0
+	lda z80_c 		; width.
+	sec
+	sbc #1			; subtract one.
+	cmp #32 		; is it between 1 and 32?
+	bcc :+
+	lda #$60
+	jmp iscrl0		; no, disable messages.
 :
-	; 29.03.03 ld a, c 	; message number.
-	lda z80_c
-	sta z80_a
+	ldx z80_b		; message number.
+	jsr getwrd 		; find message start.
 
-	; 29.03.03 ld d, b 	; copy width to d.
-	lda z80_b
-	sta z80_d
-
-	; 04.00.xx call getwrd 	; find message start.
-	jsr getwrd
-
-	; 29.03.03 ld b, d 	; restore width to b register.
-	lda z80_d
-	sta z80_b
-
-	; 29.02.04 ld (txtini), hl 	; set initial text position.
-	lda z80_l
+	lda z80_l		; set initial text position.
 	sta txtini
 	lda z80_h
 	sta txtini+1
 
-	; 29.03.05 ld a, 42 	; code for ld hl,(nn).
-	lda #42; code for ld hl,(nn).
-	sta z80_a
-
+	lda #$ad		; code for lda adrr
 iscrl0:
-	; 29.02.03 ld (scrly), a 	; enable/disable scrolling routine.
-	lda z80_a
-	sta scrly
+	sta scrly		; enable/disable scrolling routine.
 
-	; 04.00.xx call prescr 	; set up display position.
-	jsr prescr
+	jsr prescr 		; set up display position.
+	jsr gprad 		; get print address.
 
-	; 04.00.xx call gprad 	; get print address.
-	jsr gprad
-
-	; 29.03.03 ld l, b 	; width in b so copy to hl.
-	lda z80_b
-	sta z80_l
-
-	; 29.03.05 ld h, 0 	; no high byte.
-	lda #0; no high byte.
-	sta z80_h
-
-	; 13.04.xx dec hl 	; width minus one.
-	dec z80_l
-	bne :+
-	dec z80_h
-:
-	; 01.04.04 add hl, de 	; add width.
-	jsr add_hl_de
-
-	; 29.02.04 ld (txtscr), hl 	; set text screen address.
-	lda z80_l
+	lda scraddr 		; set text screen address.
 	sta txtscr
-	lda z80_h
+	lda scraddr+1
 	sta txtscr+1
 
-	; 29.03.03 ld a, b 	; width.
-	lda z80_b
-	sta z80_a
+	lda z80_c		; width.
+	sta txtwid		; set width in working storage.
 
-	; 29.02.03 ld (txtwid), a 	; set width in working storage.
-	lda z80_a
-	sta txtwid
+	lda #128 		; start with leftmost bit.
+	sta txtbit
 
-	; 29.04.00 ld hl, txtbit 	; bit of text to display.
-	lda #<(txtbit)
-	sta z80_l
-	lda #>(txtbit)
-	sta z80_h
-
-	; 29.01.05 ld (hl), 128 	; start with leftmost bit.
-	lda #128
-	ldy #0
-	sta (z80_hl),y
-
-	; 28.00.xx jr scrly4 	
 	jmp scrly4
+.endif
 
-
-; Sprite table ------------------------------------------------------------------
+;------------------------------------------------------------------
+; Sprite table 
+;------------------------------------------------------------------
 
 
 ; ix+0  = type.
@@ -7902,12 +7257,15 @@ user:
 ; Missing vars 
 ;----------------------------------------------------
 
-MAP:		.res 3*256	; properties map buffer.
+;MAP:		.res 3*256	; properties map buffer.
+;SCADTB_lb:	.res 193	; screen address table, just below map.
+;SCADTB_hb:	.res 193
+;SHRAPN:		.res 55*6	; shrapnel table, just below screen address table.
 
-SCADTB_lb:	.res 192	; screen address table, just below map.
-SCADTB_hb:	.res 192
-
-SHRAPN:		.res 55*6	; shrapnel table, just below screen address table.
+MAP 		= $9a00
+SCADTB_lb 	= MAP+3*256
+SCADTB_hb 	= SCADTB_lb+256
+SHRAPN 		= SCADTB_hb+256
 
 FontPtr:	.byte 0,0
 TmpAddr:	.byte 0,0

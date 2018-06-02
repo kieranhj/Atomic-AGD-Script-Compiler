@@ -235,6 +235,7 @@ enum
 	INS_DECAYPARTICLE,
 	INS_NEWPARTICLE,
 	INS_MESSAGE,
+	INS_STOPFALL,
 	
 	CMP_EVENT,
 	CMP_DEFINEBLOCK,
@@ -251,10 +252,10 @@ enum
 	CMP_DEFINEMESSAGES,
 	CMP_DEFINEFONT,
 
-	CON_LEFT,
 	CON_RIGHT,
-	CON_UP,
+	CON_LEFT,
 	CON_DOWN,
+	CON_UP,
 	CON_FIRE,
 	CON_FIRE2,
 	CON_FIRE3,
@@ -273,6 +274,10 @@ enum
 	CON_BPROP4,
 	CON_BPROP5,
 	CON_BPROP6,
+//	CON_FAST,
+//	CON_MEDIUM,
+//	CON_SLOW,
+//	CON_VERYSLOW,
 
 	CON_PLAYER,
 	CON_TYPE1,
@@ -432,6 +437,7 @@ void CR_ParticleRight( void );
 void CR_ParticleTimer( void );
 void CR_StartParticle( void );
 void CR_Message( void );
+void CR_StopFall( void );
 void CR_Event( void );
 void CR_DefineBlock( void );
 void CR_DefineWindow( void );
@@ -587,67 +593,67 @@ unsigned const char *keywrd =
 	"SHOWSCORE."		// show score.
 	"SHOWBONUS."		// show bonus.
 	"SCORE."		// increase score.
-	"BONUS."		// increase bonus.
-	"ADDBONUS."		// add bonus to score.
+	"BONUS."			// increase bonus.
+	"ADDBONUS."			// add bonus to score.
 	"ZEROBONUS."		// add bonus to score.
-	"SOUND."		// play sound.
-	"BEEP."			// play beeper sound.
-	"CRASH."		// play white noise sound.
-	"CLS."			// clear screen.
-	"BORDER."		// set border.
-	"COLOUR."		// set all attributes.
-	"PAPER."		// set PAPER attributes.
-	"INK."			// set INK attributes.
-	"CLUT."			// set CLUT attributes.
-	"DELAY."		// pause for a while.
-	"PRINT."		// display message.
+	"SOUND."			// play sound.
+	"BEEP."				// play beeper sound.
+	"CRASH."			// play white noise sound.
+	"CLS."				// clear screen.
+	"BORDER."			// set border.
+	"COLOUR."			// set all attributes.
+	"PAPER."			// set PAPER attributes.
+	"INK."				// set INK attributes.
+	"CLUT."				// set CLUT attributes.
+	"DELAY."			// pause for a while.
+	"PRINT."			// display message.
 	"PRINTMODE."		// changes text mode, 0 or 1.
-	"AT."			// coordinates.
-	"CHR."			// show character.
-	"MENU."			// menu in a box.
-	"INV."			// inventory menu.
-	"KILL."			// kill the player.
-	"ADD."			// add to variable.
-	"SUBTRACT."		// subtract from variable.
-	"DISPLAY."		// display number.
-	"SCREENUP."		// up a screen.
+	"AT."				// coordinates.
+	"CHR."				// show character.
+	"MENU."				// menu in a box.
+	"INV."				// inventory menu.
+	"KILL."				// kill the player.
+	"ADD."				// add to variable.
+	"SUBTRACT."			// subtract from variable.
+	"DISPLAY."			// display number.
+	"SCREENUP."			// up a screen.
 	"SCREENDOWN."		// down a screen.
 	"SCREENLEFT."		// left a screen.
 	"SCREENRIGHT."		// right a screen.
-	"WAITKEY."		// wait for keypress.
-	"JUMP."			// jump.
-	"FALL."			// fall.
-	"OTHER."		// select second collision sprite.
-	"SPAWNED."		// select spawned sprite.
+	"WAITKEY."			// wait for keypress.
+	"JUMP."				// jump.
+	"FALL."				// fall.
+	"OTHER."			// select second collision sprite.
+	"SPAWNED."			// select spawned sprite.
 	"ENDSPRITE."		// select original sprite.
-	"ENDGAME."		// end game with victory.
-	"GET."			// get object.
-	"PUT."			// drop object.
+	"ENDGAME."			// end game with victory.
+	"GET."				// get object.
+	"PUT."				// drop object.
 	"REMOVEOBJ."		// remove object.
 	"DETECTOBJ."		// detect object.
-	"ASM."			// encode.
-	"EXIT."			// exit.
-	"REPEAT."		// repeat.
+	"ASM."				// encode.
+	"EXIT."				// exit.
+	"REPEAT."			// repeat.
 	"ENDREPEAT."		// endrepeat.
-	"MULTIPLY."		// multiply.
-	"DIVIDE."		// divide.
+	"MULTIPLY."			// multiply.
+	"DIVIDE."			// divide.
 	"SPRITEINK."		// set sprite ink.
-	"TRAIL."		// leave a trail.
-	"LASER."		// shoot a laser.
-	"STAR."			// starfield.
-	"EXPLODE."		// start a shrapnel explosion.
-	"REDRAW."		// redraw the play area.
-	"SILENCE."		// silence AY channels.
-	"CLW."			// clear play area window.
-	"PALETTE."		// set palette entry.
-	"GETBLOCK."		// get block at screen position.
-	"PLOT."			// plot pixel.
+	"TRAIL."			// leave a trail.
+	"LASER."			// shoot a laser.
+	"STAR."				// starfield.
+	"EXPLODE."			// start a shrapnel explosion.
+	"REDRAW."			// redraw the play area.
+	"SILENCE."			// silence AY channels.
+	"CLW."				// clear play area window.
+	"PALETTE."			// set palette entry.
+	"GETBLOCK."			// get block at screen position.
+	"PLOT."				// plot pixel.
 	"UNDOSPRITEMOVE."	// undo last sprite movement.
-	"READ."			// read data.
-	"DATA."			// block of data.
-	"RESTORE."		// restore to start of list.
-	"TICKER."		// ticker message.
-	"USER."			// user routine.
+	"READ."				// read data.
+	"DATA."				// block of data.
+	"RESTORE."			// restore to start of list.
+	"TICKER."			// ticker message.
+	"USER."				// user routine.
 	"DEFINEPARTICLE."	// define the user particle behaviour.
 	"PARTICLEUP."		// move up.
 	"PARTICLEDOWN."		// move down.
@@ -655,7 +661,8 @@ unsigned const char *keywrd =
 	"PARTICLERIGHT."	// move right.
 	"PARTICLEDECAY."	// decrement timer and remove.
 	"NEWPARTICLE."		// start a new user particle.
-	"MESSAGE."		// display a message.
+	"MESSAGE."			// display a message.
+	"STOPFALL."			// stop falling.
 
 	/* compiler keywords. */
 	"EVENT."			// change event.
@@ -665,30 +672,30 @@ unsigned const char *keywrd =
 	"DEFINESCREEN."		// define screen.
 	"SPRITEPOSITION."	// define sprite position.
 	"DEFINEOBJECT."		// define object.
-	"MAP."			// set up map.
+	"MAP."				// set up map.
 	"STARTSCREEN."		// start screen.
-	"WIDTH."		// map width.
-	"ENDMAP."		// end of map.
+	"WIDTH."			// map width.
+	"ENDMAP."			// end of map.
 	"DEFINEPALETTE."	// define palette.
 	"DEFINEMESSAGES."	// define messages.
 	"DEFINEFONT."		// define font.
 
 	/* Constants. */
-	"RIGHT."		// right constant (keys).
-	"LEFT."			// left constant (keys).
-	"DOWN."			// down constant (keys).
-	"UP."			// up constant (keys).
-	"FIRE1."		// fire constant (keys).
-	"FIRE2."		// fire2 constant (keys).
-	"FIRE3."		// fire3 constant (keys).
-	"OPTION1."		// option constant (keys).
-	"OPTION2."		// option constant (keys).
-	"OPTION3."		// option constant (keys).
-	"OPTION4."		// option constant (keys).
-	"BULLET."		// collision bullet.
-	"KEYBOARD."		// control option.
-	"KEMPSTON."		// control option.
-	"SINCLAIR."		// control option.
+	"RIGHT."			// right constant (keys).
+	"LEFT."				// left constant (keys).
+	"DOWN."				// down constant (keys).
+	"UP."				// up constant (keys).
+	"FIRE2."			// fire2 constant (keys).
+	"FIRE3."			// fire3 constant (keys).
+	"FIRE."				// fire constant (keys).
+	"OPTION1."			// option constant (keys).
+	"OPTION2."			// option constant (keys).
+	"OPTION3."			// option constant (keys).
+	"OPTION4."			// option constant (keys).
+	"BULLET."			// collision bullet.
+	"KEYBOARD."			// control option.
+	"KEMPSTON."			// control option.
+	"SINCLAIR."			// control option.
 	"EMPTYBLOCK."		// empty space.
 	"PLATFORMBLOCK."	// platform.
 	"WALLBLOCK."		// wall.
@@ -696,7 +703,11 @@ unsigned const char *keywrd =
 	"FODDERBLOCK."		// fodder.
 	"DEADLYBLOCK."		// deadly.
 	"CUSTOMBLOCK."		// custom.
-	"PLAYER."		// player.
+//	"FAST."				// animation speed.
+//	"MEDIUM."			// animation speed.
+//	"SLOW."				// animation speed.
+//	"VERYSLOW."			// animation speed.
+	"PLAYER."			// player.
 	"SPRITETYPE1."		// sprite type 1.
 	"SPRITETYPE2."		// sprite type 2.
 	"SPRITETYPE3."		// sprite type 3.
@@ -709,18 +720,18 @@ unsigned const char *keywrd =
 	"MAINLOOP1."		// main loop 1.
 	"MAINLOOP2."		// main loop 2.
 	"INTROMENU."		// main menu.
-	"GAMEINIT."		// game initialisation.
+	"GAMEINIT."			// game initialisation.
 	"RESTARTSCREEN."	// restart a screen.
 	"FELLTOOFAR."		// sprite fell too far.
 	"KILLPLAYER."		// kill player.
-	"LOSTGAME."		// game over.
+	"LOSTGAME."			// game over.
 	"COMPLETEDGAME."	// won game.
 	"NEWHIGHSCORE."		// new high score.
 };
 
 const short int nConstantsTable[] =
 {
-	0, 1, 2, 3, 4, 5, 6,		// keys left, right, up, down, fire, fire2, fire3.
+	0, 1, 2, 3, 5, 6, 4,		// keys left, right, up, down, fire, fire2, fire3.
 	7, 8, 9, 10,			// keys option1, option2, option3, option4.
 	10,				// laser bullet.
 	0, 1, 2,			// keyboard and joystick controls.
@@ -805,62 +816,62 @@ unsigned char cDefaultFont[ 768 ];
 
 unsigned long int nErrors = 0;
 unsigned short int nSourceLength = 0;
-unsigned long int lSize;					/* source file length. */
+unsigned long int lSize;									/* source file length. */
 unsigned short int nLine;
-unsigned short int nAddress = 0;				/* compilation start address. */
-unsigned short int nCurrent;					/* current compilation address. */
+unsigned short int nAddress = 0;							/* compilation start address. */
+unsigned short int nCurrent;								/* current compilation address. */
 unsigned char *cBufPos;
 unsigned char *cBuff;
 unsigned char *cObjt;
 unsigned char *cStart;
 unsigned short int nIfBuff[ NUM_NESTING_LEVELS ][ 2 ];		/* nested IF addresses. */
-unsigned short int nNumIfs;					/* number of IFs. */
-unsigned short int nReptBuff[ NUM_REPEAT_LEVELS ];		/* nested REPEAT addresses. */
-unsigned short int nNumRepts;					/* number of REPEATs. */
+unsigned short int nNumIfs;									/* number of IFs. */
+unsigned short int nReptBuff[ NUM_REPEAT_LEVELS ];			/* nested REPEAT addresses. */
+unsigned short int nNumRepts;								/* number of REPEATs. */
 unsigned short int nWhileBuff[ NUM_NESTING_LEVELS ][ 3 ];	/* nested WHILE addresses. */
-unsigned short int nNumWhiles;					/* number of WHILEs. */
-unsigned short int nGravity;					/* gravity call flag. */
+unsigned short int nNumWhiles;								/* number of WHILEs. */
+unsigned short int nGravity;								/* gravity call flag. */
 unsigned short int nIfSet;
-unsigned short int nPamType;					/* parameter type. */
-unsigned short int nPamNum;					/* parameter number. */
-unsigned short int nLastOperator;				/* last operator. */
-unsigned short int nLastCondition;				/* IF or WHILE. */
-unsigned short int nOpType;					/* operation type, eg add or subtract. */
-unsigned short int nIncDec = 0;					/* non-zero when only inc or dec needed. */
-unsigned short int nNextLabel;					/* label to write. */
-unsigned short int nEvent;					/* event number passed to compiler */
-unsigned short int nAnswerWantedHere;				/* where to put the result of add, sub, mul or div. */
-char cSingleEvent;						/* whether we're building one event or rebuilding the lot. */
-char cConstant;							/* non-zero when dealing with a constant. */
-unsigned short int nConstant;					/* last constant. */
-unsigned short int nMessageNumber = 0;				/* number of text messages in the game. */
-unsigned short int nScreen = 0;					/* number of screens. */
-unsigned short int nPositions = 0;				/* number of sprite positions. */
-unsigned short int nObjects = 0;				/* number of objects. */
-unsigned short int nParticle = 0;				/* non-zero when user has written custom routine. */
-unsigned short int nReadingControls = 0;			/* Non-zero when reading controls in a WHILE loop. */
-unsigned char cData = 0;					/* non-zero when we've encountered a data statement. */
-unsigned char cDataRequired = 0;				/* non-zero when we need to find data. */
-unsigned char cWindow = 0;					/* non-zero when window defined. */
+unsigned short int nPamType;								/* parameter type. */
+unsigned short int nPamNum;									/* parameter number. */
+unsigned short int nLastOperator;							/* last operator. */
+unsigned short int nLastCondition;							/* IF or WHILE. */
+unsigned short int nOpType;									/* operation type, eg add or subtract. */
+unsigned short int nIncDec = 0;								/* non-zero when only inc or dec needed. */
+unsigned short int nNextLabel;								/* label to write. */
+unsigned short int nEvent;									/* event number passed to compiler */
+unsigned short int nAnswerWantedHere;						/* where to put the result of add, sub, mul or div. */
+char cSingleEvent;											/* whether we're building one event or rebuilding the lot. */
+char cConstant;												/* non-zero when dealing with a constant. */
+unsigned short int nConstant;								/* last constant. */
+unsigned short int nMessageNumber = 0;						/* number of text messages in the game. */
+unsigned short int nScreen = 0;								/* number of screens. */
+unsigned short int nPositions = 0;							/* number of sprite positions. */
+unsigned short int nObjects = 0;							/* number of objects. */
+unsigned short int nParticle = 0;							/* non-zero when user has written custom routine. */
+unsigned short int nReadingControls = 0;					/* Non-zero when reading controls in a WHILE loop. */
+unsigned char cData = 0;									/* non-zero when we've encountered a data statement. */
+unsigned char cDataRequired = 0;							/* non-zero when we need to find data. */
+unsigned char cWindow = 0;									/* non-zero when window defined. */
 unsigned char cPalette = 0;
-unsigned short int nList[ NUM_EVENTS ];				/* number of data elements in each event. */
-short int nWinTop = 0;						/* window position. */
-short int nWinLeft = 0;short int nWinHeight = 0;
-								/* window dimensions. */
+unsigned short int nList[ NUM_EVENTS ];						/* number of data elements in each event. */
+short int nWinTop = 0;										/* window position. */
+short int nWinLeft = 0;
+short int nWinHeight = 0;									/* window dimensions. */
 short int nWinWidth = 0;
-short int nStartScreen = -1;					/* starting screen. */
-unsigned char cMapWid = 0;					/* width of map. */
-short int nStartOffset = 0;					/* starting screen offset. */
-short int nUseFont = 0;						/* use custom font when non-zero. */
+short int nStartScreen = -1;								/* starting screen. */
+unsigned char cMapWid = 0;									/* width of map. */
+short int nStartOffset = 0;									/* starting screen offset. */
+short int nUseFont = 1;										/* use custom font when non-zero. */
 
-FILE *pObject;							/* output file. */
-FILE *pEngine;							/* engine source file. */
-FILE *pWorkMsg;							/* message work file. */
-FILE *pWorkBlk;							/* block work file. */
-FILE *pWorkSpr;							/* sprite work file. */
-FILE *pWorkScr;							/* screen layout work file. */
-FILE *pWorkNme;							/* sprite position work file. */
-FILE *pWorkObj;							/* objects work file. */
+FILE *pObject;												/* output file. */
+FILE *pEngine;												/* engine source file. */
+FILE *pWorkMsg;												/* message work file. */
+FILE *pWorkBlk;												/* block work file. */
+FILE *pWorkSpr;												/* sprite work file. */
+FILE *pWorkScr;												/* screen layout work file. */
+FILE *pWorkNme;												/* sprite position work file. */
+FILE *pWorkObj;												/* objects work file. */
 
 /* Functions */
 int main( int argc, const char* argv[] )
@@ -877,8 +888,7 @@ int main( int argc, const char* argv[] )
 	char szWorkFile4Name[ 128 ] = { "" };
 	char szWorkFile5Name[ 128 ] = { "" };
 	char szWorkFile6Name[ 128 ] = { "" };
-	char cbuf;
-	char *cChar = &cbuf;
+	char *cChar;
 
 	puts( "AGD Compiler for ZX Spectrum Version 0.6" );
 	puts( "(C) Jonathan Cauldwell February 2018" );
@@ -1422,7 +1432,7 @@ void CreateMessages( void )
 
 		if ( nStart )
 		{
-			WriteText( "\n        .byte \"" );						/* start of text message */
+			WriteText( "\n        .byte " );						/* start of text message */
 		}
 		else
 		{
@@ -1908,7 +1918,7 @@ void CreateFont( void )
 	if ( nUseFont > 0 )
 	{
 		WriteText( "\nfont:" );
-		while ( nChar++ < 96 )
+		for ( nChar = 0; nChar < 96; nChar++ )
 		{
 			WriteInstruction( ".byte " );
 			for ( nByte = 0; nByte < 8; nByte++ )
@@ -2080,11 +2090,11 @@ unsigned short int NextKeyword( void )
 	cBufPos = cSrc;
 
 	/* Treat constants as numbers */
-	if ( nResWord >= CON_LEFT &&
+	if ( nResWord >= CON_RIGHT &&
 		 nResWord < LAST_CONSTANT )
 	{
 		cConstant++;
-		nConstant = nConstantsTable[ nResWord - CON_LEFT ];
+		nConstant = nConstantsTable[ nResWord - CON_RIGHT ];
 		nResWord = INS_NUM;
 	}
 
@@ -2586,6 +2596,9 @@ void Compile( unsigned short int nInstruction )
 		case INS_MESSAGE:
 			CR_Message();
 			break;
+		case INS_STOPFALL:
+			CR_StopFall();
+			break;
 		case CMP_EVENT:
 			CR_Event();
 			break;
@@ -2922,13 +2935,23 @@ void CR_By( void )
 			{
 				case 1:										/* multiply/divide by 1 has no effect. */
 					break;
-				case 2:
+
 				case 3:
-				case 4:
 				case 5:
 				case 6:
-				case 8:
 				case 10:
+					if ( nOpType == INS_MULTIPLY )
+					{
+						CompileShift( nArg2 );				/* compile a shift instead. */
+					}
+					else
+					{
+						cGenericCalculation++;
+					}
+					break;
+				case 2:
+				case 4:
+				case 8:
 				case 16:
 				case 32:
 				case 64:
@@ -3037,21 +3060,25 @@ void CompileShift( short int nArg )
 				WriteInstruction( "asl a" );
 				WriteInstruction( "asl a" );
 				break;
-// TODO .....
 			case 32:
-				WriteInstruction( "rrca" );
-				WriteInstruction( "rrca" );
-				WriteInstruction( "rrca" );
-				WriteInstruction( "and 224" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
 				break;
 			case 64:
-				WriteInstruction( "rrca" );
-				WriteInstruction( "rrca" );
-				WriteInstruction( "and 192" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
+				WriteInstruction( "asl a" );
 				break;
 			case 128:
-				WriteInstruction( "rrca" );
-				WriteInstruction( "and 128" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "ror a" );
+				WriteInstruction( "and #128" );
 				break;
 		}
 	}
@@ -3077,20 +3104,24 @@ void CompileShift( short int nArg )
 				WriteInstruction( "lsr a" );
 				WriteInstruction( "lsr a" );
 				break;
-// TODO .....
 			case 32:
-				WriteInstruction( "rlca" );
-				WriteInstruction( "rlca" );
-				WriteInstruction( "rlca" );
-				WriteInstruction( "and 7" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
 				break;
 			case 64:
-				WriteInstruction( "rlca" );
-				WriteInstruction( "rlca" );
-				WriteInstruction( "and 3" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "lsr a" );
 				break;
 			case 128:
-				WriteInstruction( "rlca" );
+				WriteInstruction( "lsr a" );
+				WriteInstruction( "rol a" );
 				WriteInstruction( "and 1" );
 				break;
 		}
@@ -3108,7 +3139,8 @@ void CR_Got( void )
 	CompileArgument();
 	WriteInstruction( "jsr gotob" );
 	WriteInstruction( "cmp #255" );
-	WriteInstruction( "bne       " );
+	WriteInstruction( "beq :+" );
+        WriteInstruction( "jmp       " );
 	CompileCondition();
 	WriteText("\n:" );
 	ResetIf();
@@ -3483,26 +3515,26 @@ void CR_Sound( void )
 
 void CR_Beep( void )
 {
-//	unsigned short int nArg = NextKeyword();
-//
-//	if ( nArg == INS_NUM )									/* literal number. */
-//	{
-//		nArg = GetNum( 8 );
+	unsigned short int nArg = NextKeyword();
+
+	if ( nArg == INS_NUM )									/* literal number. */
+	{
+		nArg = GetNum( 8 );
 //		if ( nArg > 127 )
 //		{
 //			nArg = 127;
 //		}
-//		WriteInstruction( "ld a," );
-//		WriteNumber( nArg );
-//	}
-//	else													/* work out sound address. */
-//	{
-//		CompileKnownArgument( nArg );						/* puts argument into accumulator. */
+		WriteInstruction( "lda #" );
+		WriteNumber( nArg );
+	}
+	else													/* work out sound address. */
+	{
+		CompileKnownArgument( nArg );						/* puts argument into accumulator. */
 //		WriteInstruction( "and 127" );						/* reset white noise flag. */
-//	}
-//
-//	WriteInstruction( "ld (sndtyp),a" );
-	WriteInstruction( "; BEEP command");
+	}
+
+	WriteInstruction( "asl a" );
+	WriteInstruction( "sta sndtyp" );
 }
 
 void CR_Crash( void )
@@ -3662,6 +3694,8 @@ void CR_Menu( void )
 void CR_Inventory( void )
 {
 	CompileArgument();
+//	unsigned short int nArg1 = NextKeyword();
+//	fprintf( stderr, "INVENTORY %u",nArg1);
 	WriteInstruction( "tax" );
 	WriteInstruction( "jsr minve" );
 }
@@ -3778,13 +3812,19 @@ void CR_Get( void )
 
 void CR_Put( void )
 {
+//	CompileArgument();
+//	WriteInstruction( "pha; CR_PUT" );							/* remember object number. */
+//	CompileArgument();										/* put object number in accumulator. */
+//	WriteInstruction( "sta dispx" );							/* remember object number. */
+//	CompileArgument();
+//	WriteInstruction( "sta dispy" );							/* remember object number. */
+//	WriteInstruction( "pla" );
+//	WriteInstruction( "jsr drpob" );
 	CompileArgument();
-	WriteInstruction( "pha; CR_PUT" );							/* remember object number. */
-	CompileArgument();										/* put object number in accumulator. */
 	WriteInstruction( "sta dispx" );							/* remember object number. */
 	CompileArgument();
 	WriteInstruction( "sta dispy" );							/* remember object number. */
-	WriteInstruction( "pla" );
+	CompileArgument();
 	WriteInstruction( "jsr drpob" );
 }
 
@@ -3892,34 +3932,34 @@ void CR_SpriteInk( void )
 
 void CR_Trail( void )
 {
-//	WriteInstruction( "jsr vapour" );
-	WriteInstruction( "; VAPOUR command" );
+	WriteInstruction( "jsr vapour" );
+//	WriteInstruction( "; VAPOUR command" );
 }
 
 void CR_Laser( void )
 {
-//	CompileArgument();										/* 0 or 1 for direction. */
-//	WriteInstruction( "jsr shoot" );
-	WriteInstruction( "; LASER command" );
+	CompileArgument();										/* 0 or 1 for direction. */
+	WriteInstruction( "jsr shoot" );
+//	WriteInstruction( "; LASER command" );
 }
 
 void CR_Star( void )
 {
-//	CompileArgument();										/* direction 0 - 3. */
-//	WriteInstruction( "sta z80_c" );
-//	WriteInstruction( "jsr qrand" );
-//	WriteInstruction( "and #3" );
-//	WriteInstruction( "bne :+" );
-//	WriteInstruction( "jmp star" );
-//	WriteText( "\n:" );
-	WriteInstruction( "; STAR command" );
+	CompileArgument();										/* direction 0 - 3. */
+	WriteInstruction( "sta z80_c" );
+	WriteInstruction( "jsr qrand" );
+	WriteInstruction( "and #3" );
+	WriteInstruction( "bne :+" );
+	WriteInstruction( "jsr star" );
+	WriteText( "\n:" );
+//	WriteInstruction( "; STAR command" );
 }
 
 void CR_Explode( void )
 {
-//	CompileArgument();										/* number of particles required. */
-//	WriteInstruction( "jsr explod" );
-	WriteInstruction( "; EXPLODE command" );
+	CompileArgument();										/* number of particles required. */
+	WriteInstruction( "jsr explod" );
+//	WriteInstruction( "; EXPLODE command" );
 }
 
 void CR_Redraw( void )
@@ -4211,6 +4251,11 @@ void CR_Message( void )
 	WriteInstruction( "jsr dmsg" );
 }
 
+void CR_StopFall( void )
+{
+	WriteInstruction( "jsr gravst" );
+}
+
 void CR_Plot( void )
 {
 	unsigned short int nArg1 = NextKeyword();
@@ -4265,45 +4310,46 @@ void CR_UndoSpriteMove( void )
 
 void CR_Ticker( void )
 {
-//	unsigned short int nArg1 = NextKeyword();
-//	unsigned short int nArg2;
+	unsigned short int nArg1 = NextKeyword();
+	unsigned short int nArg2;
 
-//	if ( nArg1 == INS_NUM )									/* first argument is numeric. */
-//	{
-//		nArg1 = GetNum( 8 );								/* store first argument. */
-//		if ( nArg1 == 0 )
-//		{
-//			WriteInstruction( "ld hl,scrly" );
-//			WriteInstruction( "ld (hl),201" );
-//		}
-//		else
-//		{
-//			nArg2 = NextKeyword();							/* get second argument. */
-//			if ( nArg2 == INS_STR )							/* second argument should be a string. */
-//			{
-//				WriteInstruction( "lda #" );
-//				WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
-//				WriteInstruction( "sta z80_c" );
-//				WriteInstruction( "lda #" );
-//				WriteNumber( nArg2 );						/* pass both parameters as 16-bit argument. */
-//				WriteInstruction( "sta z80_b" );
-//				WriteInstruction( "jsr iscrly" );
-//			}
-//			else
-//			{
-//				Error( "Invalid argument for TICKER" );
-//			}
-//		}
-//	}
-//	else
-//	{
-//		CompileKnownArgument( nArg1 );						/* puts first argument into accumulator. */
-//		WriteInstruction( "sta z80_b" );						/* copy into c register. */
-//		CompileArgument();									/* puts second argument into accumulator. */
-//		WriteInstruction( "sta z80_c" );						/* put that into b. */
-//		WriteInstruction( "jsr iscrly" );
-//	}
-		WriteInstruction( "; TICKER" );
+	if ( nArg1 == INS_NUM )									/* first argument is numeric. */
+	{
+		nArg1 = GetNum( 8 );								/* store first argument. */
+		if ( nArg1 == 0 )
+		{
+			WriteInstruction( "lda #96" );  // RTS opcode
+			WriteInstruction( "sta scrly" );
+		}
+		else
+		{
+			nArg2 = NextKeyword();							/* get second argument. */
+			if ( nArg2 == INS_STR )							/* second argument should be a string. */
+			{
+				nArg2 = nMessageNumber++;
+				WriteInstruction( "lda #" );
+				WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
+				WriteInstruction( "sta z80_c" );
+				WriteInstruction( "lda #" );
+				WriteNumber( nArg2 );						/* pass both parameters as 16-bit argument. */
+				WriteInstruction( "sta z80_b" );
+				WriteInstruction( "jsr iscrly" );
+			}
+			else
+			{
+				Error( "Invalid argument for TICKER" );
+			}
+		}
+	}
+	else
+	{
+		CompileKnownArgument( nArg1 );						/* puts first argument into accumulator. */
+		WriteInstruction( "sta z80_b" );						/* copy into c register. */
+		CompileArgument();									/* puts second argument into accumulator. */
+		WriteInstruction( "sta z80_c" );						/* put that into b. */
+		WriteInstruction( "jsr iscrly" );
+	}
+//		WriteInstruction( "; TICKER" );
 }
 
 void CR_User( void )
@@ -4782,6 +4828,8 @@ void CR_DefineFont( void )
 	unsigned short int nArg;
 	short int nByte = 0;
 
+	nUseFont = 1;
+
 	while ( nByte < 768 )
 	{
 		nArg = NextKeyword();
@@ -4793,6 +4841,7 @@ void CR_DefineFont( void )
 		{
 			Error( "DEFINEFONT missing data" );
 			nByte = 768;
+			nUseFont = 0;
 		}
 	}
 }

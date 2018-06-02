@@ -2984,7 +2984,7 @@ void CR_By( void )
 			{
 				WriteInstruction( "sta z80_h" );
 				WriteInstruction( "jsr imul" );			/* hl = h * d. */
-				WriteInstruction( "lda z80_h" );
+				WriteInstruction( "lda z80_l" );
 			}
 			else
 			{
@@ -3392,7 +3392,7 @@ void CR_GetRandom( void )
 	WriteInstruction( "jsr random" );						/* random number 0 - 255. */
 	WriteInstruction( "sta z80_h" );							/* second multiplication parameter. */
 	WriteInstruction( "jsr imul" );						/* multiply together. */
-	WriteInstruction( "lda z80_h" );							/* put result in accumulator. */
+	WriteInstruction( "lda z80_l" );							/* put result in accumulator. */
 	WriteInstruction( "sta varrnd" );					/* write to random variable. */
 }
 

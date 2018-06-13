@@ -1484,14 +1484,14 @@ void CreateBlocks( void )
 	}
 	while ( ( cSrc - cBuff ) < lSize );
 
-	/* Now do the block attributes. */
-	WriteText( "\nbcol:" );
-	nData = 0;
-	while ( nData < nCounter )
-	{
-		WriteText( "\n        .byte " );
-		WriteNumber( nAttr[ nData++ ] );
-	}
+//	/* Now do the block attributes. */
+//	WriteText( "\nbcol:" );
+//	nData = 0;
+//	while ( nData < nCounter )
+//	{
+//		WriteText( "\n        .byte " );
+//		WriteNumber( nAttr[ nData++ ] );
+//	}
 
 	/* Now do the block properties. */
 	WriteText( "\nbprop:" );

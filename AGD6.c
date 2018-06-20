@@ -265,8 +265,8 @@ enum
 	CON_OPTION4,
 	CON_BULLET,
 	CON_KEYBOARD,
-	CON_KEMPSTON,
-	CON_SINCLAIR,
+	CON_JOYKEY,
+	CON_JOYMMC,
 	CON_BPROP0,
 	CON_BPROP1,
 	CON_BPROP2,
@@ -694,8 +694,8 @@ unsigned const char *keywrd =
 	"OPTION4."			// option constant (keys).
 	"BULLET."			// collision bullet.
 	"KEYBOARD."			// control option.
-	"KEMPSTON."			// control option.
-	"SINCLAIR."			// control option.
+	"JOYKEY."			// control option.
+	"JOYMMC."			// control option.
 	"EMPTYBLOCK."		// empty space.
 	"PLATFORMBLOCK."	// platform.
 	"WALLBLOCK."		// wall.
@@ -790,7 +790,7 @@ const unsigned char cVariables[][ 7 ] =
 	"varv",				// variable.
 	"varw",				// variable.
 	"varz",				// variable.
-	"contrl",			// keyboard/Kempston/Sinclair controls.
+	"contrl",			// keyboard/joykey/joymmc controls.
 	"chary",			// y coordinate.
 	"charx",			// x coordinate.
 	"clock",			// last clock reading.
@@ -1893,21 +1893,21 @@ void CreateObjects( void )
 void CreatePalette( void )
 {
 	cPalette = 0;
-	WriteText( "\npalett:" );
+//	WriteText( "\npalett:" );
 
-	while ( cPalette < 64 )
-	{
-		if ( ( cPalette & 15 ) == 0 )
-		{
-			WriteInstruction( ".byte " );
-		}
-		else
-		{
-			WriteText( "," );
-		}
-
-		WriteNumber( cDefaultPalette[ cPalette++ ] );
-	}
+//	while ( cPalette < 64 )
+//	{
+//		if ( ( cPalette & 15 ) == 0 )
+//		{
+//			WriteInstruction( ".byte " );
+//		}
+//		else
+//		{
+//			WriteText( "," );
+//		}
+//
+//		WriteNumber( cDefaultPalette[ cPalette++ ] );
+//	}
 }
 
 void CreateFont( void )

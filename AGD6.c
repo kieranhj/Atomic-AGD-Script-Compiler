@@ -4163,13 +4163,13 @@ void CR_Restore( void )
 
 	if ( SpriteEvent() )
 	{
-		WriteInstruction( "lda #255" );				/* set data pointer to beyond range. */
+		WriteInstruction( "lda #0" );				/* set data pointer to beyond range. */
 		WriteInstruction( "ldy #16" );
 		WriteInstruction( "sta (z80_ix),y" );
 	}
 	else
 	{
-		WriteInstruction( "lda #255" );
+		WriteInstruction( "lda #0" );
 		sprintf( szInstruction, "sta rptr%02d", nEvent );
 		WriteInstruction( szInstruction );
 	}
@@ -4239,10 +4239,16 @@ void CR_ParticleTimer( void )
 
 void CR_StartParticle( void )
 {
+	WriteInstruction( "lda z80_i" );
+	WriteInstruction( "pha" );
+	WriteInstruction( "lda z80_x" );
+	WriteInstruction( "pha" );
 	CompileArgument();										/* palette register to write. */
-//	WriteInstruction( "push ix" );
 	WriteInstruction( "jsr ptusr" );
-//	WriteInstruction( "pop ix" );
+	WriteInstruction( "pla" );
+	WriteInstruction( "sta z80_x" );
+	WriteInstruction( "pla" );
+	WriteInstruction( "sta z80_i" );
 }
 
 void CR_Message( void )

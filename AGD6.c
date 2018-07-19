@@ -251,6 +251,7 @@ enum
 	CMP_DEFINEPALETTE,
 	CMP_DEFINEMESSAGES,
 	CMP_DEFINEFONT,
+	CMP_DEFINECONTROLS,
 
 	CON_RIGHT,
 	CON_LEFT,
@@ -274,10 +275,11 @@ enum
 	CON_BPROP4,
 	CON_BPROP5,
 	CON_BPROP6,
-//	CON_FAST,
-//	CON_MEDIUM,
-//	CON_SLOW,
-//	CON_VERYSLOW,
+	CON_BPROP7,
+	CON_FAST,
+	CON_MEDIUM,
+	CON_SLOW,
+	CON_VERYSLOW,
 
 	CON_PLAYER,
 	CON_TYPE1,
@@ -321,6 +323,7 @@ void CreatePositions( void );
 void CreateObjects( void );
 void CreatePalette( void );
 void CreateFont( void );
+void CreateKeyTable( void );
 unsigned short int NextKeyword( void );
 void CountLines( char cSrc );
 unsigned short int GetNum( short int nBits );
@@ -449,6 +452,8 @@ void CR_Map( void );
 void CR_DefinePalette( void );
 void CR_DefineMessages( void );
 void CR_DefineFont( void );
+void CR_DefineControls( void );
+unsigned char ConvertKey( short int nNum );
 
 char SpriteEvent( void );
 void CompileShift( short int nArg );
@@ -679,6 +684,7 @@ unsigned const char *keywrd =
 	"DEFINEPALETTE."	// define palette.
 	"DEFINEMESSAGES."	// define messages.
 	"DEFINEFONT."		// define font.
+	"DEFINECONTROLS."	// define key table.
 
 	/* Constants. */
 	"RIGHT."			// right constant (keys).
@@ -703,10 +709,11 @@ unsigned const char *keywrd =
 	"FODDERBLOCK."		// fodder.
 	"DEADLYBLOCK."		// deadly.
 	"CUSTOMBLOCK."		// custom.
-//	"FAST."				// animation speed.
-//	"MEDIUM."			// animation speed.
-//	"SLOW."				// animation speed.
-//	"VERYSLOW."			// animation speed.
+	"WATERBLOCK."		// water.
+	"FAST."				// animation speed.
+	"MEDIUM."			// animation speed.
+	"SLOW."				// animation speed.
+	"VERYSLOW."			// animation speed.
 	"PLAYER."			// player.
 	"SPRITETYPE1."		// sprite type 1.
 	"SPRITETYPE2."		// sprite type 2.
@@ -735,7 +742,8 @@ const short int nConstantsTable[] =
 	7, 8, 9, 10,			// keys option1, option2, option3, option4.
 	10,				// laser bullet.
 	0, 1, 2,			// keyboard and joystick controls.
-	0, 1, 2, 3, 4, 5, 6,		// block types.
+	0, 1, 2, 3, 4, 5, 6, 7,		// block types.
+	0, 1, 3, 7,			// animation speeds.
 	EVENT_SPRITE_0,			// events.
 	EVENT_SPRITE_1,
 	EVENT_SPRITE_2,
@@ -810,6 +818,15 @@ unsigned char cDefaultPalette[] =
 
 unsigned char cDefaultFont[ 768 ];
 
+unsigned char cDefaultKeys[ 11 ] =
+{
+	0x35,0x15,0x93,0x22,0x90,0x04,0x14,0x21,0x11,0x01,0x92
+};
+
+const unsigned char cKeyOrder[ 11 ] =
+{
+	3,2,1,0,4,5,6,7,8,9,10
+};
 
 
 /* Variables. */
@@ -1244,6 +1261,7 @@ int main( int argc, const char* argv[] )
 	CreateObjects();
 	CreatePalette();
 	CreateFont();
+	CreateKeyTable();
 
 	fwrite( cStart, 1, nCurrent - nAddress, pObject );
 	free( cBuff );
@@ -1935,6 +1953,21 @@ void CreateFont( void )
 	{
 		WriteText( "\nfont:   = $9800" );
 	}
+}
+
+void CreateKeyTable( void )
+{
+	short int nKey;
+
+	WriteText( "\nkeys:   .byte " );
+
+	for ( nKey = 0; nKey < 10; nKey++ )
+	{
+		WriteNumber( cDefaultKeys[ nKey ] );
+		WriteText( "," );
+	}
+
+	WriteNumber( cDefaultKeys[ nKey ] );
 }
 
 /* Return next keyword number */
@@ -2632,6 +2665,9 @@ void Compile( unsigned short int nInstruction )
 		case CMP_DEFINEFONT:
 			CR_DefineFont();
 			break;
+		case CMP_DEFINECONTROLS:
+			CR_DefineControls();
+			break;
 		default:
 			printf( "Instruction %d not handled\n", nInstruction );
 			break;
@@ -3251,11 +3287,67 @@ void CR_Collision( void )
 
 void CR_Anim( void )
 {
+	unsigned short int nArg;
+	unsigned char *cSrc;									/* source pointer. */
+	short int nCurrentLine = nLine;
+
+	/* Store source address so we don't skip first instruction after messages. */
+	cSrc = cBufPos;
+	nArg = NextKeyword();
+
+	if ( nArg == INS_NUM )									/* first argument is numeric. */
+	{
+		nArg = GetNum( 8 );									/* store first argument. */
+	}
+	else
+	{
+		cBufPos = cSrc;										/* restore source address so we don't miss the next line. */
+		nLine = nCurrentLine;
+		nArg = 0;
+	}
+
+	if ( nArg == 0 )
+	{
+		WriteInstruction( "lda #0" );
+	}
+	else
+	{
+		WriteInstruction( "lda #" );
+		WriteNumber( nArg );								/* first argument in c register. */
+	}
 	WriteInstruction( "jsr animsp" );
 }
 
 void CR_AnimBack( void )
 {
+	unsigned short int nArg;
+	unsigned char *cSrc;									/* source pointer. */
+	short int nCurrentLine = nLine;
+
+	/* Store source address so we don't skip first instruction after messages. */
+	cSrc = cBufPos;
+	nArg = NextKeyword();
+
+	if ( nArg == INS_NUM )									/* first argument is numeric. */
+	{
+		nArg = GetNum( 8 );									/* store first argument. */
+	}
+	else
+	{
+		cBufPos = cSrc;										/* restore source address so we don't miss the next line. */
+		nLine = nCurrentLine;
+		nArg = 0;
+	}
+
+	if ( nArg == 0 )
+	{
+		WriteInstruction( "lda #0" );
+	}
+	else
+	{
+		WriteInstruction( "lda #," );
+		WriteNumber( nArg );								/* first argument in c register. */
+	}
 	WriteInstruction( "jsr animbk" );
 }
 
@@ -4864,6 +4956,238 @@ void CR_DefineFont( void )
 			nUseFont = 0;
 		}
 	}
+}
+
+void CR_DefineControls( void )
+{
+	unsigned char *cSrc;									/* source pointer. */
+	unsigned short int nArg;
+	unsigned short int nNum = 0;
+	short int nByte = 0;
+	short int nCount = 0;
+	short int nCurrentLine = nLine;
+
+	/* Store source address so we don't skip first instruction after messages. */
+	cSrc = cBufPos;
+
+	do
+	{
+		nArg = NextKeyword();
+		if ( nArg == INS_NUM )
+		{
+			nNum = ( unsigned char )GetNum( 8 );
+			if ( nCount < 11 )
+			{
+				cDefaultKeys[ cKeyOrder[ nCount++ ] ] = ConvertKey( nNum );
+			}
+		}
+	}
+	while ( nArg == INS_NUM );
+
+	cBufPos = cSrc;									/* restore source address so we don't miss the next line. */
+	nLine = nCurrentLine;
+}
+
+unsigned char ConvertKey( short int nNum )
+{
+	short int nCode = 40;
+
+	/* Convert to upper case. */
+	if ( nNum > 96 && nNum < 123 )
+	{
+		nNum -= 32;
+	}
+
+	switch( nNum )
+	{
+
+	// row 0
+		case 0x33:		// 3
+			nCode = 0x01;
+			break;
+		case 0xbd:		// -
+			nCode = 0x02;
+			break;
+		case 0x47:		// G
+			nCode = 0x03;
+			break;
+		case 0x51:		// Q
+			nCode = 0x04;
+			break;
+		case 0x1b:		// ESC
+			nCode = 0x05;
+			break;
+
+	// row 1
+		case 0x32:		// 2
+			nCode = 0x11;
+			break;
+		case 0x2c:		// ,
+			nCode = 0x12;
+			break;
+		case 0x46:		// F
+			nCode = 0x13;
+			break;
+		case 0x50:		// P
+			nCode = 0x14;
+			break;
+		case 0x5a:		// Z
+			nCode = 0x15;
+			break;
+
+	// row 2
+		case 0x26:		// UP/DOWN
+			nCode = 0x20;
+			break;
+		case 0x31:		// 1
+			nCode = 0x21;
+			break;
+		case 0x3b:		// ;
+			nCode = 0x22;
+			break;
+		case 0x45:		// E
+			nCode = 0x23;
+			break;
+		case 0x4f:		// O
+			nCode = 0x24;
+			break;
+		case 0x59:		// Y
+			nCode = 0x25;
+			break;
+
+	// row 3
+		case 0x27:		// LINKS/RECHTS
+			nCode = 0x30;
+			break;
+		case 0x30:		// 0
+			nCode = 0x31;
+			break;
+		case 0x3a:		// :
+			nCode = 0x32;
+			break;
+		case 0x44:		// D
+			nCode = 0x33;
+			break;
+		case 0x4e:		// N
+			nCode = 0x34;
+			break;
+		case 0x58:		// X
+			nCode = 0x35;
+			break;
+
+	// row 4
+		case 0x14:		// LOCK
+			nCode = 0x40;
+			break;
+		case 0x08:		// DELETE
+			nCode = 0x41;
+			break;
+		case 0x39:		// 9
+			nCode = 0x42;
+			break;
+		case 0x43:		// C
+			nCode = 0x43;
+			break;
+		case 0x4d:		// M
+			nCode = 0x44;
+			break;
+		case 0x57:		// W
+			nCode = 0x45;
+			break;
+
+	// row 5
+		case 0x5e:		// UP
+			nCode = 0x50;
+			break;
+		case 0xf2:		// COPY
+			nCode = 0x51;
+			break;
+		case 0x38:		// 8
+			nCode = 0x52;
+			break;
+		case 0x42:		// B
+			nCode = 0x53;
+			break;
+		case 0x4c:		// L
+			nCode = 0x54;
+			break;
+		case 0x56:		// V
+			nCode = 0x55;
+			break;
+
+	// row 6
+		case 0x5d:		// ]
+			nCode = 0x60;
+			break;
+		case 0x0d:		// RETURN
+			nCode = 0x61;
+			break;
+		case 0x37:		// 7
+			nCode = 0x62;
+			break;
+		case 0x41:		// A
+			nCode = 0x63;
+			break;
+		case 0x4b:		// K
+			nCode = 0x64;
+			break;
+		case 0x55:		// U
+			nCode = 0x65;
+			break;
+
+	// row 7
+		case 0x5c:		// \
+			nCode = 0x70;
+			break;
+		case 0x36:		// 6
+			nCode = 0x72;
+			break;
+		case 0x40:		// @
+			nCode = 0x73;
+			break;
+		case 0x4a:		// J
+			nCode = 0x74;
+			break;
+		case 0x54:		// T
+			nCode = 0x75;
+			break;
+
+	// row 8
+		case 0x5b:		// [
+			nCode = 0x80;
+			break;
+		case 0x35:		// 5
+			nCode = 0x82;
+			break;
+		case 0x2f:		// /
+			nCode = 0x83;
+			break;
+		case 0x49:		// I
+			nCode = 0x84;
+			break;
+		case 0x53:		// S
+			nCode = 0x85;
+			break;
+
+	// row 9
+		case 0x20:		// SPACE
+			nCode = 0x90;
+			break;
+		case 0x34:		// 4
+			nCode = 0x92;
+			break;
+		case 0x2e:		// .
+			nCode = 0x93;
+			break;
+		case 0x48:		// H
+			nCode = 0x94;
+			break;
+		case 0x52:		// R
+			nCode = 0x95;
+			break;
+	}
+
+	return ( nCode );
 }
 
 char SpriteEvent( void )

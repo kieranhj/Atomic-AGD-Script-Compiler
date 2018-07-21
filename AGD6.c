@@ -236,6 +236,9 @@ enum
 	INS_NEWPARTICLE,
 	INS_MESSAGE,
 	INS_STOPFALL,
+	INS_DOUBLEDIGITS,
+	INS_TRIPLEDIGITS,
+	INS_CLOCK,
 	
 	CMP_EVENT,
 	CMP_DEFINEBLOCK,
@@ -668,6 +671,9 @@ unsigned const char *keywrd =
 	"NEWPARTICLE."		// start a new user particle.
 	"MESSAGE."			// display a message.
 	"STOPFALL."			// stop falling.
+	"DOUBLEDIGITS."		// show as double digits.
+	"TRIPLEDIGITS."		// show as triple digits.
+	"SECONDS."			// show as timer.
 
 	/* compiler keywords. */
 	"EVENT."			// change event.
@@ -3825,8 +3831,56 @@ void CR_AddSubtract( void )
 
 void CR_Display( void )
 {
-	CompileArgument();
-	WriteInstruction( "jsr disply" );
+	unsigned char *cSrc;									/* source pointer. */
+	unsigned short int nArg;
+
+	cSrc = cBufPos;											/* store position in buffer. */
+	nArg = NextKeyword();
+
+	switch( nArg )
+	{
+		case INS_DOUBLEDIGITS:
+			WriteInstruction( "lda #<displ0" );
+			WriteInstruction( "sta z80_c" );
+			WriteInstruction( "lda #>displ0" );
+			WriteInstruction( "sta z80_b" );
+			CompileArgument();
+			WriteInstruction( "jsr num2dd" );
+			WriteInstruction( "jsr displ1" );
+			break;
+		case INS_TRIPLEDIGITS:
+			WriteInstruction( "lda #<displ0" );
+			WriteInstruction( "sta z80_c" );
+			WriteInstruction( "lda #>displ0" );
+			WriteInstruction( "sta z80_b" );
+			CompileArgument();
+			WriteInstruction( "jsr num2td" );
+			WriteInstruction( "jsr displ1" );
+			break;
+		case INS_CLOCK:
+			CompileArgument();
+			WriteInstruction( "sta z80_d" );
+			WriteInstruction( "lda #60" );
+			WriteInstruction( "sta z80_e" );
+			WriteInstruction( "jsr idiv" );			/* d = d/e, remainder in a. */
+			WriteInstruction( "pha" );
+			WriteInstruction( "lda z80_d" );
+			WriteInstruction( "jsr disply" );
+			WriteInstruction( "inc charx" );
+			WriteInstruction( "lda #<displ0" );
+			WriteInstruction( "sta z80_c" );
+			WriteInstruction( "lda #>displ0" );
+			WriteInstruction( "sta z80_b" );
+			WriteInstruction( "pla" );
+			WriteInstruction( "jsr num2dd" );
+			WriteInstruction( "jsr displ1" );
+			break;
+		default:
+			cBufPos = cSrc;									/* restore buffer position and compile standard DISPLAY command. */
+			CompileArgument();
+			WriteInstruction( "jsr disply" );
+			break;
+	}
 }
 
 void CR_ScreenUp( void )

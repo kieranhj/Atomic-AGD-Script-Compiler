@@ -35,6 +35,7 @@ enum
 	EVENT_LOST_GAME,
 	EVENT_COMPLETED_GAME,
 	EVENT_NEW_HIGH_SCORE,
+	EVENT_COLLECTED_BLOCK,
 	NUM_EVENTS												/* number of separate events to compile. */
 };
 
@@ -236,6 +237,7 @@ enum
 	INS_NEWPARTICLE,
 	INS_MESSAGE,
 	INS_STOPFALL,
+	INS_GETBLOCKS,
 	INS_DOUBLEDIGITS,
 	INS_TRIPLEDIGITS,
 	INS_CLOCK,
@@ -279,6 +281,7 @@ enum
 	CON_BPROP5,
 	CON_BPROP6,
 	CON_BPROP7,
+	CON_BPROP8,
 	CON_FAST,
 	CON_MEDIUM,
 	CON_SLOW,
@@ -304,6 +307,7 @@ enum
 	CON_TYPE17,
 	CON_TYPE18,
 	CON_TYPE19,
+	CON_TYPE20,
 	LAST_CONSTANT,
 	FINAL_INSTRUCTION = LAST_CONSTANT,
 	INS_STR
@@ -444,6 +448,7 @@ void CR_ParticleTimer( void );
 void CR_StartParticle( void );
 void CR_Message( void );
 void CR_StopFall( void );
+void CR_GetBlocks( void );
 void CR_Event( void );
 void CR_DefineBlock( void );
 void CR_DefineWindow( void );
@@ -671,6 +676,7 @@ unsigned const char *keywrd =
 	"NEWPARTICLE."		// start a new user particle.
 	"MESSAGE."			// display a message.
 	"STOPFALL."			// stop falling.
+	"GETBLOCKS."		// get collectable blocks.
 	"DOUBLEDIGITS."		// show as double digits.
 	"TRIPLEDIGITS."		// show as triple digits.
 	"SECONDS."			// show as timer.
@@ -716,6 +722,7 @@ unsigned const char *keywrd =
 	"DEADLYBLOCK."		// deadly.
 	"CUSTOMBLOCK."		// custom.
 	"WATERBLOCK."		// water.
+	"COLLECTABLE."		// collectable.
 	"FAST."				// animation speed.
 	"MEDIUM."			// animation speed.
 	"SLOW."				// animation speed.
@@ -740,6 +747,7 @@ unsigned const char *keywrd =
 	"LOSTGAME."			// game over.
 	"COMPLETEDGAME."	// won game.
 	"NEWHIGHSCORE."		// new high score.
+	"COLLECTBLOCK."		// collected block.
 };
 
 const short int nConstantsTable[] =
@@ -748,7 +756,7 @@ const short int nConstantsTable[] =
 	7, 8, 9, 10,			// keys option1, option2, option3, option4.
 	10,				// laser bullet.
 	0, 1, 2,			// keyboard and joystick controls.
-	0, 1, 2, 3, 4, 5, 6, 7,		// block types.
+	0, 1, 2, 3, 4, 5, 6, 7, 8,	// block types.
 	0, 1, 3, 7,			// animation speeds.
 	EVENT_SPRITE_0,			// events.
 	EVENT_SPRITE_1,
@@ -770,6 +778,7 @@ const short int nConstantsTable[] =
 	EVENT_LOST_GAME,
 	EVENT_COMPLETED_GAME,
 	EVENT_NEW_HIGH_SCORE,
+	EVENT_COLLECTED_BLOCK,
 };
 
 const unsigned char cVariables[][ 7 ] =
@@ -1360,7 +1369,7 @@ void BuildFile( void )
 	}
 	while ( cBufPos < ( cBuff + lSize ) );
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();											/* always put a ret at the end. */
 	}
@@ -2637,6 +2646,9 @@ void Compile( unsigned short int nInstruction )
 			break;
 		case INS_STOPFALL:
 			CR_StopFall();
+			break;
+		case INS_GETBLOCKS:
+			CR_GetBlocks();
 			break;
 		case CMP_EVENT:
 			CR_Event();
@@ -4408,6 +4420,11 @@ void CR_StopFall( void )
 	WriteInstruction( "jsr gravst" );
 }
 
+void CR_GetBlocks( void )
+{
+	WriteInstruction( "jsr getcol" );
+}
+
 void CR_Plot( void )
 {
 	unsigned short int nArg1 = NextKeyword();
@@ -4544,7 +4561,7 @@ void CR_Event( void )
 {
 	unsigned short int nArg1 = NextKeyword();
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();											/* always put a ret at the end. */
 	}
@@ -4553,7 +4570,7 @@ void CR_Event( void )
 	{
 		nArg1 = GetNum( 8 );								/* store first argument. */
 
-		if ( nArg1 >= 0 && nArg1 <= 19 )
+		if ( nArg1 >= 0 && nArg1 < NUM_EVENTS )
 		{
 			nEvent = nArg1;
 			StartEvent( nEvent );							/* write event label and header. */
@@ -4575,7 +4592,7 @@ void CR_DefineBlock( void )
 	char cChar;
 	short int nDatum = 0;
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();											/* always put a ret at the end. */
 		nEvent = -1;
@@ -4605,7 +4622,7 @@ void CR_DefineWindow( void )
 	char szInstruction[ 18 ];
 	unsigned short int nArg;
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();											/* always put a ret at the end. */
 		nEvent = -1;
@@ -4691,7 +4708,7 @@ void CR_DefineSprite( void )
 	short int nDatum = 0;
 	short int nFrames = 0;
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();											/* always put a ret at the end. */
 		nEvent = -1;
@@ -4738,7 +4755,7 @@ void CR_DefineScreen( void )
 	short int nBytes = nWinWidth * nWinHeight;
 	char szMsg[ 41 ];
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();												/* always put a ret at the end. */
 		nEvent = -1;
@@ -4776,7 +4793,7 @@ void CR_SpritePosition( void )
 	short int nCount = 0;
 	char cChar;
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();												/* always put a ret at the end. */
 		nEvent = -1;
@@ -4809,7 +4826,7 @@ void CR_DefineObject( void )
 	short int nDatum = 0;
 	unsigned char cChar;
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();												/* always put a ret at the end. */
 		nEvent = -1;
@@ -4843,7 +4860,7 @@ void CR_Map( void )
 	short int nDatum = 0;
 	short int nDone = 0;
 
-	if ( nEvent >= 0 && nEvent <= 19 )
+	if ( nEvent >= 0 && nEvent < NUM_EVENTS )
 	{
 		EndEvent();												/* always put a ret at the end. */
 	}

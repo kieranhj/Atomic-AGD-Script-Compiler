@@ -920,11 +920,12 @@ int main( int argc, const char* argv[] )
 	char szWorkFile4Name[ 128 ] = { "" };
 	char szWorkFile5Name[ 128 ] = { "" };
 	char szWorkFile6Name[ 128 ] = { "" };
-	char *cChar;
+	char cChar;
 
 	puts( "AGD Compiler for ZX Spectrum Version 0.6" );
 	puts( "(C) Jonathan Cauldwell February 2018" );
-	puts( "Atom version by Kees van Oss March 2018 \n" );
+	puts( "Atom version by Kees van Oss March 2018" );
+	puts( "BBC Micro version by Kieran Connell July 2018 \n");
 
     if ( argc == 2 )
 	{
@@ -1005,12 +1006,12 @@ int main( int argc, const char* argv[] )
 		exit ( 1 );
 	}
 
-	lSize = fread( cChar, 1, 1, pEngine );			/* read first character of engine source. */
+	lSize = fread( &cChar, 1, 1, pEngine );			/* read first character of engine source. */
 
 	while ( lSize > 0 )
 	{
-		fwrite( cChar, 1, 1, pObject );				/* write code to output file. */
-		lSize = fread( cChar, 1, 1, pEngine );		/* read next byte of source. */
+		fwrite( &cChar, 1, 1, pObject );				/* write code to output file. */
+		lSize = fread( &cChar, 1, 1, pEngine );		/* read next byte of source. */
 	}
 
 	/* Allocate buffer for the target code. */

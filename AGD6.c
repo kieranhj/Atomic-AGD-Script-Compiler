@@ -835,7 +835,7 @@ unsigned char cDefaultFont[ 768 ];
 
 unsigned char cDefaultKeys[ 11 ] =
 {
-	0x35,0x15,0x93,0x22,0x90,0x04,0x14,0x21,0x11,0x01,0x92
+	0x42,0x61,0x68,0x48,0x62,0x10,0x37,0x30,0x31,0x11,0x12
 };
 
 const unsigned char cKeyOrder[ 11 ] =
@@ -1330,7 +1330,10 @@ void StartEvent( unsigned short int nEvent )
 	ResetIf();
 
 	/* Reset number of DATA statement elements. */
-	nList[ nEvent ] = 0;
+	if (nEvent < 99)
+	{
+		nList[nEvent] = 0;
+	}
 	cData = 0;
 	cDataRequired = 0;
 
@@ -5208,7 +5211,7 @@ unsigned char ConvertKey( short int nNum )
 			break;
 
 	// row 7
-		case 0x5c:		// \
+		case 0x5c:		// '\'
 			nCode = 0x70;
 			break;
 		case 0x36:		// 6

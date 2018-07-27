@@ -3178,9 +3178,9 @@ void CompileShift( short int nArg )
 				WriteInstruction( "lsr a" );
 				break;
 			case 128:
-				WriteInstruction( "lsr a" );
+				WriteInstruction( "asl a" );
 				WriteInstruction( "rol a" );
-				WriteInstruction( "and 1" );
+				WriteInstruction( "and #1" );
 				break;
 		}
 	}

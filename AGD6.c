@@ -197,6 +197,8 @@ enum
 	INS_WAITKEY,
 	INS_JUMP,
 	INS_FALL,
+	INS_TABLEJUMP,
+	INS_TABLEFALL,
 	INS_OTHER,
 	INS_SPAWNED,
 	INS_ORIGINAL,
@@ -256,6 +258,7 @@ enum
 	CMP_DEFINEPALETTE,
 	CMP_DEFINEMESSAGES,
 	CMP_DEFINEFONT,
+	CMP_DEFINEJUMP,
 	CMP_DEFINECONTROLS,
 
 	CON_RIGHT,
@@ -330,6 +333,7 @@ void CreatePositions( void );
 void CreateObjects( void );
 void CreatePalette( void );
 void CreateFont( void );
+void CreateHopTable( void );
 void CreateKeyTable( void );
 unsigned short int NextKeyword( void );
 void CountLines( char cSrc );
@@ -408,6 +412,8 @@ void CR_ScreenRight( void );
 void CR_WaitKey( void );
 void CR_Jump( void );
 void CR_Fall( void );
+void CR_TableJump( void );
+void CR_TableFall( void );
 void CR_Other( void );
 void CR_Spawned( void );
 void CR_Original( void );
@@ -460,6 +466,7 @@ void CR_Map( void );
 void CR_DefinePalette( void );
 void CR_DefineMessages( void );
 void CR_DefineFont( void );
+void CR_DefineJump( void );
 void CR_DefineControls( void );
 unsigned char ConvertKey( short int nNum );
 
@@ -636,6 +643,8 @@ unsigned const char *keywrd =
 	"WAITKEY."			// wait for keypress.
 	"JUMP."				// jump.
 	"FALL."				// fall.
+	"TABLEJUMP."		// jump.
+	"TABLEFALL."		// fall.
 	"OTHER."			// select second collision sprite.
 	"SPAWNED."			// select spawned sprite.
 	"ENDSPRITE."		// select original sprite.
@@ -696,6 +705,7 @@ unsigned const char *keywrd =
 	"DEFINEPALETTE."	// define palette.
 	"DEFINEMESSAGES."	// define messages.
 	"DEFINEFONT."		// define font.
+	"DEFINEJUMP."		// define jump table.
 	"DEFINECONTROLS."	// define key table.
 
 	/* Constants. */
@@ -833,6 +843,12 @@ unsigned char cDefaultPalette[] =
 
 unsigned char cDefaultFont[ 768 ];
 
+/* Hop/jump table. */
+unsigned char cDefaultHop[ 25 ] =
+{
+	248,250,252,254,254,255,255,255,0,0,0,1,1,1,2,2,4,6,8,8,8,99
+};
+
 unsigned char cDefaultKeys[ 11 ] =
 {
 	0x35,0x15,0x93,0x22,0x90,0x04,0x14,0x21,0x11,0x01,0x92
@@ -895,6 +911,7 @@ short int nStartScreen = -1;								/* starting screen. */
 unsigned char cMapWid = 0;									/* width of map. */
 short int nStartOffset = 0;									/* starting screen offset. */
 short int nUseFont = 1;										/* use custom font when non-zero. */
+short int nUseHopTable = 0;									/* use jump table when non-zero. */
 
 FILE *pObject;												/* output file. */
 FILE *pEngine;												/* engine source file. */
@@ -1276,6 +1293,7 @@ int main( int argc, const char* argv[] )
 	CreateObjects();
 	CreatePalette();
 	CreateFont();
+	CreateHopTable();
 	CreateKeyTable();
 
 	fwrite( cStart, 1, nCurrent - nAddress, pObject );
@@ -1970,6 +1988,26 @@ void CreateFont( void )
 	}
 }
 
+void CreateHopTable( void )
+{
+	short int nChar = 0;
+
+	WriteText( "\njtab:" );
+	nChar = 0;
+	WriteInstruction( ".byte " );
+
+	if ( nUseHopTable > 0 )
+	{
+		while ( cDefaultHop[ nChar ] != 99 )
+		{
+			WriteNumber( cDefaultHop[ nChar++ ] );
+			WriteText( "," );
+		}
+	}
+
+	WriteNumber( 99 );
+}
+
 void CreateKeyTable( void )
 {
 	short int nKey;
@@ -2527,6 +2565,12 @@ void Compile( unsigned short int nInstruction )
 		case INS_FALL:
 			CR_Fall();
 			break;
+		case INS_TABLEJUMP:
+			CR_TableJump();
+			break;
+		case INS_TABLEFALL:
+			CR_TableFall();
+			break;
 		case INS_OTHER:
 			CR_Other();
 			break;
@@ -2682,6 +2726,9 @@ void Compile( unsigned short int nInstruction )
 			break;
 		case CMP_DEFINEFONT:
 			CR_DefineFont();
+			break;
+		case CMP_DEFINEJUMP:
+			CR_DefineJump();
 			break;
 		case CMP_DEFINECONTROLS:
 			CR_DefineControls();
@@ -3924,12 +3971,28 @@ void CR_Jump( void )
 {
 	WriteInstruction( "jsr jump" );
 	nGravity++;
+	nUseHopTable++;
 }
 
 void CR_Fall( void )
 {
 	WriteInstruction( "jsr ifall" );
 	nGravity++;
+	nUseHopTable++;
+}
+
+void CR_TableJump( void )
+{
+	WriteInstruction( "jsr jump" );
+	nGravity++;
+	nUseHopTable++;
+}
+
+void CR_TableFall( void )
+{
+	WriteInstruction( "jsr ifall" );
+	nGravity++;
+	nUseHopTable++;
 }
 
 void CR_Other( void )
@@ -5027,6 +5090,39 @@ void CR_DefineFont( void )
 			nUseFont = 0;
 		}
 	}
+}
+
+void CR_DefineJump( void )
+{
+	unsigned short int nArg;
+	unsigned short int nNum = 0;
+	short int nByte = 0;
+
+	while ( nNum != 99 )
+	{
+		nArg = NextKeyword();
+		if ( nArg == INS_NUM )
+		{
+			nNum = ( unsigned char )GetNum( 8 );
+			cDefaultHop[ nByte ] = nNum;
+			if ( nByte < 25 )
+			{
+				nByte++;
+			}
+			else
+			{
+				Error( "DEFINEJUMP table too big" );
+				nNum = 99;
+			}
+		}
+		else
+		{
+			Error( "DEFINEJUMP missing 99 end marker" );
+			nNum = 99;
+		}
+	}
+
+	cDefaultHop[ 24 ] = 99;
 }
 
 void CR_DefineControls( void )

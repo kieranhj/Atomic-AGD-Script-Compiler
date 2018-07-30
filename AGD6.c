@@ -489,6 +489,8 @@ void WriteInstructionArg( unsigned char *cCommand, unsigned short int nNum );
 void WriteLabel( unsigned short int nWhere );
 void NewLine( void );
 void Error( unsigned char *cMsg );
+void LoadYRegister(unsigned short Yvalue);
+void InvalidateYRegister(void);
 
 /* Constants. */
 
@@ -872,6 +874,8 @@ unsigned short int nOpType;									/* operation type, eg add or subtract. */
 unsigned short int nIncDec = 0;								/* non-zero when only inc or dec needed. */
 unsigned short int nNextLabel;								/* label to write. */
 unsigned short int nEvent;									/* event number passed to compiler */
+unsigned short int lastEvent = 99;							/* for debugging purposes */
+unsigned short int previousYvalue = 1000;					/* for debugging purposes */
 unsigned short int nAnswerWantedHere;						/* where to put the result of add, sub, mul or div. */
 char cSingleEvent;											/* whether we're building one event or rebuilding the lot. */
 char cConstant;												/* non-zero when dealing with a constant. */
@@ -1053,6 +1057,8 @@ int main( int argc, const char* argv[] )
 		cBufPos = cBuff;								/* start of buffer */
 		nLine = 1;										/* line number */
 
+		WriteText("\nscript_start:\n");
+
 		BuildFile();
 
 		/* Close source file and free up the memory. */
@@ -1064,6 +1070,9 @@ int main( int argc, const char* argv[] )
 		{
 			WriteInstructionAndLabel( "ptcusr: rts" );
 		}
+
+		WriteText("\nscript_end:\n");
+		WriteText("\n.out .sprintf(\"TOTAL SCRIPT SIZE = %d\", (* - script_start))\n");
 
 		if ( cWindow == 0 )
 		{
@@ -1279,6 +1288,9 @@ int main( int argc, const char* argv[] )
 	CreateFont();
 	CreateKeyTable();
 
+	WriteText("\ndata_end:");
+	WriteText("\n.out .sprintf(\"TOTAL DATA SIZE = %d\", (* - data_start))\n");
+
 	fwrite( cStart, 1, nCurrent - nAddress, pObject );
 	free( cBuff );
 
@@ -1313,6 +1325,7 @@ void StartEvent( unsigned short int nEvent )
 	if ( nEvent < 99 )
 	{
 		sprintf( cLine, "\nevnt%02d:", nEvent );		/* don't write label for dummy event. */
+		lastEvent = nEvent;
 	}
 
 	while ( *cChar )
@@ -1390,6 +1403,13 @@ void EndEvent( void )
 		WriteInstruction( "rts" );							/* always put a ret at the end. */
 	}
 
+	if (lastEvent < 99)
+	{
+		char cline[256];
+		sprintf(cline, "\n.out .sprintf(\"EVENT %d SIZE = %s\", (* - evnt%02d))\n", lastEvent, "%d", lastEvent);
+		WriteText(cline);
+	}
+
 	if ( nNumIfs > 0 )
 	{
 		Error( "Missing ENDIF" );
@@ -1435,6 +1455,8 @@ void CreateMessages( void )
 	nNextLabel = 0;
 
 	cObjt = cStart + ( nCurrent - nAddress );
+
+	WriteText("\ndata_start:");
 	WriteText( "\nmsgdat:" );
 
 	while ( ( cSrc - cBuff ) < lSize )
@@ -1484,6 +1506,8 @@ void CreateMessages( void )
 	WriteText( "\nnummsg:" );
 	WriteText( "\n        .byte " );						/* start of text message */
 	WriteNumber( nMessageNumber );
+
+	WriteText("\n.out .sprintf(\"MESSAGE SIZE = %d\", (* - msgdat))\n");
 }
 
 void CreateBlocks( void )
@@ -1538,6 +1562,8 @@ void CreateBlocks( void )
 		WriteText( "\n        .byte " );
 		WriteNumber( cType[ nData++ ] );
 	}
+
+	WriteText("\n.out .sprintf(\"BLOCKS SIZE = %d\", (* - chgfx))\n");
 }
 
 void CreateSprites( void )
@@ -1623,6 +1649,8 @@ void CreateSprites( void )
 	WriteText( "," );
 	WriteNumber( nFrame );
 	WriteText( ",0" );
+
+	WriteText("\n.out .sprintf(\"SPRITES SIZE = %d\", (* - sprgfx))\n");
 }
 
 void CreateScreens( void )
@@ -1757,6 +1785,8 @@ void CreateScreens( void )
 	WriteText( "\nnumsc:" );
 	WriteText( "\n        .byte " );
 	WriteNumber( nScreen );
+
+	WriteText("\n.out .sprintf(\"SCREENS SIZE = %d\", (* - scdat))\n");
 }
 
 void CreateScreens2( void )
@@ -1807,6 +1837,8 @@ void CreateScreens2( void )
 	WriteText( "\nnumsc:");
 	WriteText( "        .byte " );
 	WriteNumber( nScreen );
+
+	WriteText("\n.out .sprintf(\"SCREENS SIZE = %d\", (* - scdat))\n");
 }
 
 void CreatePositions( void )
@@ -1865,6 +1897,8 @@ void CreatePositions( void )
 			nThisScreen = nScreen;
 		}
 	}
+
+	WriteText("\n.out .sprintf(\"POSITIONS SIZE = %d\", (* - nmedat))\n");
 }
 
 void CreateObjects( void )
@@ -1925,6 +1959,8 @@ void CreateObjects( void )
 			WriteNumber( cX );
 		}
 	}
+
+	WriteText("\n.out .sprintf(\"OBJECTS SIZE = %d\", (* - objdta))\n");
 }
 
 void CreatePalette( void )
@@ -1972,6 +2008,8 @@ void CreateFont( void )
 	{
 		WriteText( "\nfont:   = $9800" );
 	}
+
+	WriteText("\n.out .sprintf(\"FONT SIZE = %d\", (* - font))\n");
 }
 
 void CreateKeyTable( void )
@@ -1987,6 +2025,8 @@ void CreateKeyTable( void )
 	}
 
 	WriteNumber( cDefaultKeys[ nKey ] );
+
+	WriteText("\n.out .sprintf(\"KEYS SIZE = %d\", (* - keys))\n");
 }
 
 /* Return next keyword number */
@@ -5519,7 +5559,8 @@ void CR_PamA( short int nNum )
 	}
 	else													/* load accumulator with sprite parameter. */
 	{
-		WriteInstructionArg( "ldy #?", nNum - IDIFF );
+	//	WriteInstructionArg( "ldy #?", nNum - IDIFF );
+		LoadYRegister(nNum - IDIFF);
 		WriteInstruction( "lda (z80_ix),y" );
 	}
 }
@@ -5535,7 +5576,8 @@ void CR_PamB( short int nNum )
 	}
 	else													/* compare accumulator with sprite parameter. */
 	{
-		WriteInstructionArg( "ldy #?", nNum - IDIFF );
+	//	WriteInstructionArg( "ldy #?", nNum - IDIFF );
+		LoadYRegister(nNum - IDIFF);
 		WriteInstruction( "cmp (z80_ix),y" );
 	}
 
@@ -5558,7 +5600,8 @@ void CR_PamC( short int nNum )
 	}
 	else													/* compare accumulator with sprite parameter. */
 	{
-		WriteInstructionArg( "ldy #?", nNum - IDIFF );
+	//	WriteInstructionArg( "ldy #?", nNum - IDIFF );
+		LoadYRegister(nNum - IDIFF);
 		WriteInstruction( "sta (z80_ix),y" );
 	}
 }
@@ -5650,18 +5693,22 @@ void WriteJPNZ( void )
 		case OPE_NOT:
 			WriteInstruction( "bne *+5" );
 			WriteInstruction( "jmp xxxxxx" );
+		//	WriteInstruction("beq xxxxxx");
 			break;
 		case OPE_GRTEQU:
 			WriteInstruction( "beq *+4" );					/* test succeeded, skip jp nc instruction */
 			WriteInstruction( "bcs xxxxxx" );
+		//	WriteInstruction("bne xxxxxx");
 			break;
 		case OPE_GRT:
 			WriteInstruction( "bcc *+5" );
 			WriteInstruction( "jmp xxxxxx" );
+		//	WriteInstruction("bcs xxxxxx");
 			break;
 		case OPE_LESEQU:
 			WriteInstruction( "bcs *+5" );
 			WriteInstruction( "jmp xxxxxx" );
+		//	WriteInstruction("bcc xxxxxx");
 			break;
 		case OPE_LES:
 			WriteInstruction( "bcc *+4");
@@ -5681,6 +5728,7 @@ void WriteJPNZ( void )
 		default:
 			WriteInstruction( "beq *+5" );
 			WriteInstruction( "jmp xxxxxx" );
+		//	WriteInstruction("bne xxxxxx");
 			break;
 	}
 }
@@ -5781,6 +5829,8 @@ void WriteLabel( unsigned short int nWhere )
 		cObjt++;
 		nCurrent++;
 	}
+
+	InvalidateYRegister();
 }
 
 void NewLine( void )
@@ -5813,4 +5863,34 @@ void Error( unsigned char *cMsg )
 {
 	fprintf( stderr, "%s on line %d\n", cMsg, nLine );
 	nErrors++;
+}
+
+void LoadYRegister(unsigned short Yvalue)
+{
+	char cline[256];
+	sprintf(cline, "; ldy #%d", Yvalue);
+	WriteInstruction(cline);
+
+	if (Yvalue != previousYvalue)
+	{
+		if (Yvalue == previousYvalue - 1)
+		{
+			WriteInstruction("dey");
+		}
+		else if (Yvalue == previousYvalue + 1)
+		{
+			WriteInstruction("iny");
+		}
+		else
+		{
+			WriteInstructionArg("ldy #?", Yvalue);
+		}
+
+		previousYvalue = Yvalue;
+	}
+}
+
+void InvalidateYRegister(void)
+{
+	previousYvalue = 1000;
 }

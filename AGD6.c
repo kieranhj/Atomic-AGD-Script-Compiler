@@ -2768,7 +2768,8 @@ void CR_While( void )
 
 void CR_SpriteUp( void )
 {
-	WriteInstruction( "ldy #8" );
+//	WriteInstruction( "ldy #8" );
+	LoadYRegister(8);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #2" );
@@ -2777,7 +2778,8 @@ void CR_SpriteUp( void )
 
 void CR_SpriteDown( void )
 {
-	WriteInstruction( "ldy #8" );
+//	WriteInstruction( "ldy #8" );
+	LoadYRegister(8);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #2" );
@@ -2786,7 +2788,8 @@ void CR_SpriteDown( void )
 
 void CR_SpriteLeft( void )
 {
-	WriteInstruction( "ldy #9" );
+//	WriteInstruction( "ldy #9" );
+	LoadYRegister(9);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #2" );
@@ -2795,7 +2798,8 @@ void CR_SpriteLeft( void )
 
 void CR_SpriteRight( void )
 {
-	WriteInstruction( "ldy #9" );
+//	WriteInstruction( "ldy #9" );
+	LoadYRegister(9);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #2" );
@@ -3266,8 +3270,9 @@ void CR_Key( void )
 		}
 		else
 		{
-			sprintf( szInstruction, "ldy #%d", nArg );	/* get key from table. */
-			WriteInstruction( szInstruction );
+		//	sprintf( szInstruction, "ldy #%d", nArg );	/* get key from table. */
+		//	WriteInstruction( szInstruction );
+			LoadYRegister(nArg);
 			WriteInstruction( "lda keys,y" );
 			WriteInstruction( "jsr ktest" );					/* test it. */
 			WriteInstruction( "bcc :+" );
@@ -3535,7 +3540,8 @@ void CR_Spawn( void )
 void CR_Remove( void )
 {
 	WriteInstruction( "lda #255" );
-	WriteInstruction( "ldy #5" );
+//	WriteInstruction( "ldy #5" );
+	LoadYRegister(5);
 	WriteInstruction( "sta (z80_ix),y" );
 }
 
@@ -3617,7 +3623,8 @@ void CR_AddBonus( void )
 void CR_ZeroBonus( void )
 {
 	WriteInstruction( "lda #48" );
-	WriteInstruction( "ldy #5" );
+//	WriteInstruction( "ldy #5" );
+	LoadYRegister(5);
 	WriteText("\n:");
 	WriteInstruction( "sta bonus,y" );
 	WriteInstruction( "dey" );
@@ -4366,7 +4373,8 @@ void CR_Restore( void )
 	if ( SpriteEvent() )
 	{
 		WriteInstruction( "lda #0" );				/* set data pointer to beyond range. */
-		WriteInstruction( "ldy #16" );
+	//	WriteInstruction( "ldy #16" );
+		LoadYRegister(16);
 		WriteInstruction( "sta (z80_ix),y" );
 	}
 	else
@@ -4393,7 +4401,8 @@ void CR_DefineParticle( void )
 
 void CR_ParticleUp( void )
 {
-	WriteInstruction( "ldy #3" );
+//	WriteInstruction( "ldy #3" );
+	LoadYRegister(3);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #1" );
@@ -4402,7 +4411,8 @@ void CR_ParticleUp( void )
 
 void CR_ParticleDown( void )
 {
-	WriteInstruction( "ldy #3" );
+//	WriteInstruction( "ldy #3" );
+	LoadYRegister(3);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #1" );
@@ -4411,7 +4421,8 @@ void CR_ParticleDown( void )
 
 void CR_ParticleLeft( void )
 {
-	WriteInstruction( "ldy #5" );
+//	WriteInstruction( "ldy #5" );
+	LoadYRegister(5);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #1" );
@@ -4420,7 +4431,8 @@ void CR_ParticleLeft( void )
 
 void CR_ParticleRight( void )
 {
-	WriteInstruction( "ldy #5" );
+//	WriteInstruction( "ldy #5" );
+	LoadYRegister(5);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #1" );
@@ -4429,7 +4441,8 @@ void CR_ParticleRight( void )
 
 void CR_ParticleTimer( void )
 {
-	WriteInstruction( "ldy #1" );
+//	WriteInstruction( "ldy #1" );
+	LoadYRegister(1);
 	WriteInstruction( "lda (z80_ix),y" );
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #1" );
@@ -4511,13 +4524,17 @@ void CR_Plot( void )
 
 void CR_UndoSpriteMove( void )
 {
-	WriteInstruction( "ldy #3" );
+//	WriteInstruction( "ldy #3" );
+	LoadYRegister(3);
 	WriteInstruction( "lda (z80_ix),y" );
-	WriteInstruction( "ldy #8" );
+//	WriteInstruction( "ldy #8" );
+	LoadYRegister(8);
 	WriteInstruction( "sta (z80_ix),y" );
-	WriteInstruction( "ldy #4" );
+//	WriteInstruction( "ldy #4" );
+	LoadYRegister(4);
 	WriteInstruction( "lda (z80_ix),y" );
-	WriteInstruction( "ldy #9" );
+//	WriteInstruction( "ldy #9" );
+	LoadYRegister(9);
 	WriteInstruction( "sta (z80_ix),y" );
 }
 
@@ -5865,8 +5882,11 @@ void Error( unsigned char *cMsg )
 	nErrors++;
 }
 
+#define _ENABLE_Y_OPTIMISATION true
+
 void LoadYRegister(unsigned short Yvalue)
 {
+#if _ENABLE_Y_OPTIMISATION
 	char cline[256];
 	sprintf(cline, "; ldy #%d", Yvalue);
 	WriteInstruction(cline);
@@ -5888,6 +5908,9 @@ void LoadYRegister(unsigned short Yvalue)
 
 		previousYvalue = Yvalue;
 	}
+#else
+	WriteInstructionArg("ldy #?", Yvalue);
+#endif
 }
 
 void InvalidateYRegister(void)

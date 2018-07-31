@@ -3,6 +3,10 @@
 /*   ZX Spectrum/CPC version written by Jonathan Cauldwell */
 /*   Atom version written by Kees van Oss 2018             */
 
+//#define _ENABLE_BRANCH_OPTIMISATION
+#define _ENABLE_A_OPTIMISATION
+#define _ENABLE_Y_OPTIMISATION
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -491,6 +495,10 @@ void NewLine( void );
 void Error( unsigned char *cMsg );
 void LoadYRegister(unsigned short Yvalue);
 void InvalidateYRegister(void);
+void LoadSpriteParameter(unsigned short sparam);
+void SaveSpriteParameter(unsigned short sparam);
+void LoadARegister(unsigned short Avalue);
+void InvalidateARegister(void);
 
 /* Constants. */
 
@@ -876,6 +884,7 @@ unsigned short int nNextLabel;								/* label to write. */
 unsigned short int nEvent;									/* event number passed to compiler */
 unsigned short int lastEvent = 99;							/* for debugging purposes */
 unsigned short int previousYvalue = 1000;					/* for debugging purposes */
+unsigned short int previousAvalue = 1000;					/* for debugging purposes */
 unsigned short int nAnswerWantedHere;						/* where to put the result of add, sub, mul or div. */
 char cSingleEvent;											/* whether we're building one event or rebuilding the lot. */
 char cConstant;												/* non-zero when dealing with a constant. */
@@ -2769,41 +2778,49 @@ void CR_While( void )
 void CR_SpriteUp( void )
 {
 //	WriteInstruction( "ldy #8" );
-	LoadYRegister(8);
-	WriteInstruction( "lda (z80_ix),y" );
+//	LoadYRegister(8);
+//	WriteInstruction( "lda (z80_ix),y" );
+	LoadSpriteParameter(8);
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #2" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_SpriteDown( void )
 {
 //	WriteInstruction( "ldy #8" );
-	LoadYRegister(8);
-	WriteInstruction( "lda (z80_ix),y" );
+//	LoadYRegister(8);
+//	WriteInstruction( "lda (z80_ix),y" );
+	LoadSpriteParameter(8);
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #2" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_SpriteLeft( void )
 {
 //	WriteInstruction( "ldy #9" );
-	LoadYRegister(9);
-	WriteInstruction( "lda (z80_ix),y" );
+//	LoadYRegister(9);
+//	WriteInstruction( "lda (z80_ix),y" );
+	LoadSpriteParameter(9);
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #2" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_SpriteRight( void )
 {
 //	WriteInstruction( "ldy #9" );
-	LoadYRegister(9);
-	WriteInstruction( "lda (z80_ix),y" );
+//	LoadYRegister(9);
+//	WriteInstruction( "lda (z80_ix),y" );
+	LoadSpriteParameter(9);
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #2" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_EndIf( void )
@@ -2854,6 +2871,8 @@ void CR_EndWhile( void )
 		if ( nReadingControls > 0 )							/* are we reading the joystick in this loop? */
 		{
 			WriteInstruction( "jsr joykey" );				/* user might be writing a sub-game! */
+			InvalidateARegister();
+			InvalidateYRegister();
 			nReadingControls = 0;							/* not foolproof, but it's close enough. */
 		}
 
@@ -2900,6 +2919,8 @@ void CR_CanGoUp( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_CanGoDown( void )
@@ -2910,6 +2931,8 @@ void CR_CanGoDown( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_CanGoLeft( void )
@@ -2920,6 +2943,8 @@ void CR_CanGoLeft( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_CanGoRight( void )
@@ -2930,6 +2955,8 @@ void CR_CanGoRight( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_LadderAbove( void )
@@ -2940,6 +2967,8 @@ void CR_LadderAbove( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_LadderBelow( void )
@@ -2950,6 +2979,8 @@ void CR_LadderBelow( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Deadly( void )
@@ -2963,10 +2994,13 @@ void CR_Deadly( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Custom( void )
 {
+	InvalidateARegister();
 	WriteInstruction( "lda #CUSTOM" );
 	WriteInstruction( "sta z80_b");
 	WriteInstruction( "jsr tded" );
@@ -2976,6 +3010,7 @@ void CR_Custom( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateYRegister();
 }
 
 void CR_To( void )
@@ -3020,6 +3055,7 @@ void CR_To( void )
 	{
 		Error( "ADD or SUBTRACT missing" );
 	}
+	InvalidateARegister();
 }
 
 void CR_By( void )
@@ -3074,8 +3110,9 @@ void CR_By( void )
 			WriteInstruction( "sta z80_d" );
 			if ( nArg1 == INS_NUM )
 			{
-				WriteInstruction( "lda #" );
-				WriteNumber( nArg2 );
+			//	WriteInstruction( "lda #" );
+			//	WriteNumber( nArg2 );
+				LoadARegister(nArg2);
 			}
 			else
 			{
@@ -3099,6 +3136,8 @@ void CR_By( void )
 			{
 				CR_PamC( nAnswerWantedHere );				/* put accumulator in variable or sprite parameter. */
 			}
+
+			InvalidateARegister();
 		}
 	}
 	else
@@ -3229,6 +3268,8 @@ void CompileShift( short int nArg )
 		}
 	}
 
+	InvalidateARegister();
+
 	if ( nAnswerWantedHere >= FIRST_PARAMETER &&
 		 nAnswerWantedHere <= LAST_PARAMETER )
 	{
@@ -3246,6 +3287,8 @@ void CR_Got( void )
 	CompileCondition();
 	WriteText("\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Key( void )
@@ -3292,6 +3335,8 @@ void CR_Key( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_DefineKey( void )
@@ -3299,12 +3344,14 @@ void CR_DefineKey( void )
 	char szInstruction[ 15 ];
 	unsigned short int nNum = NumberOnly();
 
-	sprintf( szInstruction, "lda #%d", Joystick( nNum ) );
-	WriteInstruction( szInstruction );
+//	sprintf( szInstruction, "lda #%d", Joystick( nNum ) );
+//	WriteInstruction( szInstruction );
+	LoadARegister(Joystick(nNum));
 	WriteInstruction( "tax" );
 	WriteInstruction( "jsr kget" );
 	WriteInstruction( "sta keys,x" );
-	
+	InvalidateARegister();
+
 //	WriteInstruction( "call 654" );
 //	WriteInstruction( "inc e" );
 //	WriteInstruction( "jr z,$-4" );
@@ -3312,6 +3359,7 @@ void CR_DefineKey( void )
 //	WriteInstruction( szInstruction );
 //	WriteInstruction( "dec e" );
 //	WriteInstruction( "ld (hl),e" );
+	InvalidateYRegister();
 }
 
 void CR_Collision( void )
@@ -3330,8 +3378,9 @@ void CR_Collision( void )
 		}
 		else													/* it's a sprite type. */
 		{
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg );								/* sprite type to find. */
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg );								/* sprite type to find. */
+			LoadARegister(nArg);
 			WriteInstruction( "sta z80_b" );
 			WriteInstruction( "jsr sktyp" );
 			WriteInstruction( "bcs :+" );
@@ -3350,6 +3399,8 @@ void CR_Collision( void )
 	CompileCondition();
 	WriteText( "\n:" );
 	ResetIf();
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Anim( void )
@@ -3373,16 +3424,19 @@ void CR_Anim( void )
 		nArg = 0;
 	}
 
-	if ( nArg == 0 )
-	{
-		WriteInstruction( "lda #0" );
-	}
-	else
-	{
-		WriteInstruction( "lda #" );
-		WriteNumber( nArg );								/* first argument in c register. */
-	}
+//	if ( nArg == 0 )
+//	{
+//		WriteInstruction( "lda #0" );
+//	}
+//	else
+//	{
+//		WriteInstruction( "lda #" );
+//		WriteNumber( nArg );								/* first argument in c register. */
+//	}
+	LoadARegister(nArg);
 	WriteInstruction( "jsr animsp" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_AnimBack( void )
@@ -3406,26 +3460,31 @@ void CR_AnimBack( void )
 		nArg = 0;
 	}
 
-	if ( nArg == 0 )
-	{
-		WriteInstruction( "lda #0" );
-	}
-	else
-	{
-		WriteInstruction( "lda #," );
-		WriteNumber( nArg );								/* first argument in c register. */
-	}
+//	if ( nArg == 0 )
+//	{
+//		WriteInstruction( "lda #0" );
+//	}
+//	else
+//	{
+//		WriteInstruction( "lda #," );
+//		WriteNumber( nArg );								/* first argument in c register. */
+//	}
+	LoadARegister(nArg);
 	WriteInstruction( "jsr animbk" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_PutBlock( void )
 {
+	InvalidateARegister();
 	WriteInstruction( "lda charx" );
 	WriteInstruction( "sta dispx" );
 	WriteInstruction( "lda chary" );
 	WriteInstruction( "sta dispy" );
 	CompileArgument();
 	WriteInstruction( "jsr pattr" );
+	InvalidateYRegister();
 }
 
 //void CR_DigUp( void )
@@ -3486,13 +3545,15 @@ void CR_PutBlock( void )
 
 void CR_NextLevel( void )
 {
-	WriteInstruction( "lda #1" );
+//	WriteInstruction( "lda #1" );
+	LoadARegister(1);
 	WriteInstruction( "sta nexlev" );
 }
 
 void CR_Restart( void )
 {
-	WriteInstruction( "lda #1" );
+//	WriteInstruction( "lda #1" );
+	LoadARegister(1);
 	WriteInstruction( "sta restfl" );
 }
 
@@ -3510,17 +3571,20 @@ void CR_Spawn( void )
 		{
 //			nArg2 = 256 * GetNum( 8 ) + nArg1;
 			nArg2 = GetNum( 8 );
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg1 );							/* pass both parameters as 16-bit argument. */
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg1 );							/* pass both parameters as 16-bit argument. */
+			LoadARegister(nArg1);
 			WriteInstruction( "sta z80_c");
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg2 );							/* pass both parameters as 16-bit argument. */
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg2 );							/* pass both parameters as 16-bit argument. */
+			LoadARegister(nArg2);
 			WriteInstruction( "sta z80_b");
 		}
 		else
 		{
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg1 );							/* first argument in c register. */
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg1 );							/* first argument in c register. */
+			LoadARegister(nArg1);
 			WriteInstruction( "sta z80_c");
 			CompileKnownArgument( nArg2 );					/* puts argument into accumulator. */
 			WriteInstruction( "sta z80_b" );					/* put that into b. */
@@ -3535,14 +3599,18 @@ void CR_Spawn( void )
 	}
 
 	WriteInstruction( "jsr spawn" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Remove( void )
 {
-	WriteInstruction( "lda #255" );
+//	WriteInstruction( "lda #255" );
+	LoadARegister(255);
 //	WriteInstruction( "ldy #5" );
-	LoadYRegister(5);
-	WriteInstruction( "sta (z80_ix),y" );
+//	LoadYRegister(5);
+//	WriteInstruction( "sta (z80_ix),y" );
+	SaveSpriteParameter(5);
 }
 
 void CR_GetRandom( void )
@@ -3554,6 +3622,7 @@ void CR_GetRandom( void )
 	WriteInstruction( "jsr imul" );						/* multiply together. */
 	WriteInstruction( "lda z80_h" );							/* put result in accumulator. */
 	WriteInstruction( "sta varrnd" );					/* write to random variable. */
+	InvalidateARegister();
 }
 
 void CR_Randomize( void )
@@ -3565,11 +3634,13 @@ void CR_Randomize( void )
 void CR_DisplayHighScore( void )
 {
 	WriteInstruction( "jsr dhisc" );
+	InvalidateARegister();
 }
 
 void CR_DisplayScore( void )
 {
 	WriteInstruction( "jsr dscor" );
+	InvalidateARegister();
 }
 
 void CR_DisplayBonus( void )
@@ -3577,6 +3648,7 @@ void CR_DisplayBonus( void )
 	WriteInstruction( "jsr swpsb" );						/* swap bonus into score. */
 	WriteInstruction( "jsr dscor" );						/* show it. */
 	WriteInstruction( "jsr swpsb" );						/* swap back again. */
+	InvalidateARegister();
 }
 
 void CR_Score( void )
@@ -3601,11 +3673,14 @@ void CR_Score( void )
 	{
 		CompileKnownArgument( nArg );						/* puts argument into accumulator. */
 		WriteInstruction( "sta z80_l" );						/* low byte of parameter in l. */
-		WriteInstruction( "lda #0" );
+	//	WriteInstruction( "lda #0" );
+		LoadARegister(0);
 		WriteInstruction( "sta z80_h" );						/* no high byte. */
 	}
 
 	WriteInstruction( "jsr addsc" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Bonus( void )
@@ -3613,22 +3688,26 @@ void CR_Bonus( void )
 	WriteInstruction( "jsr swpsb" );						/* swap bonus into score. */
 	CR_Score();												/* score the points. */
 	WriteInstruction( "jsr swpsb" );						/* swap back again. */
+	InvalidateARegister();
 }
 
 void CR_AddBonus( void )
 {
 	WriteInstruction( "jsr addbo" );						/* add bonus to score. */
+	InvalidateARegister();
 }
 
 void CR_ZeroBonus( void )
 {
-	WriteInstruction( "lda #48" );
-//	WriteInstruction( "ldy #5" );
+//	WriteInstruction( "lda #48" );
+	LoadARegister(48);
+	//	WriteInstruction( "ldy #5" );
 	LoadYRegister(5);
 	WriteText("\n:");
 	WriteInstruction( "sta bonus,y" );
 	WriteInstruction( "dey" );
 	WriteInstruction( "bpl :-" );
+	InvalidateYRegister();
 }
 
 void CR_Sound( void )
@@ -3685,8 +3764,9 @@ void CR_Beep( void )
 //		{
 //			nArg = 127;
 //		}
-		WriteInstruction( "lda #" );
-		WriteNumber( nArg );
+	//	WriteInstruction( "lda #" );
+	//	WriteNumber( nArg );
+		LoadARegister(nArg);
 	}
 	else													/* work out sound address. */
 	{
@@ -3696,6 +3776,7 @@ void CR_Beep( void )
 
 	WriteInstruction( "asl a" );
 	WriteInstruction( "sta sndtyp" );
+	InvalidateARegister();
 }
 
 void CR_Crash( void )
@@ -3770,8 +3851,9 @@ void CR_Delay( void )
 	if ( nArg == INS_NUM )									/* literal number. */
 	{
 		nArg = GetNum( 8 );
-		WriteInstruction( "lda #" );
-		WriteNumber( nArg );
+	//	WriteInstruction( "lda #" );
+	//	WriteNumber( nArg );
+		LoadARegister(nArg);
 	}
 	else													/* work out 8-bit argument to add. */
 	{
@@ -3781,12 +3863,16 @@ void CR_Delay( void )
 
 	WriteInstruction( "jsr delay" );
 //	WriteInstruction( "pop ix" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Print( void )
 {
 	CompileArgument();
 	WriteInstruction( "jsr dmsg" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_PrintMode( void )
@@ -3808,11 +3894,13 @@ void CR_At( void )
 //		{
 //			nArg2 = 256 * GetNum( 8 ) + nArg1;	/* pass both parameters as 16-bit argument. */
 			nArg2 = GetNum( 8 );
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg1 );
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg1 );
+			LoadARegister(nArg1);
 			WriteInstruction( "sta chary");
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg2 );
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg2 );
+			LoadARegister(nArg2);
 			WriteInstruction( "sta charx");
 //		}
 //		else
@@ -3843,6 +3931,7 @@ void CR_Chr( void )
 {
 	CompileArgument();
 	WriteInstruction( "jsr achar" );
+	InvalidateARegister();
 }
 
 void CR_Menu( void )
@@ -3850,6 +3939,8 @@ void CR_Menu( void )
 	CompileArgument();
 	WriteInstruction( "tax" );
 	WriteInstruction( "jsr mmenu" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Inventory( void )
@@ -3859,11 +3950,14 @@ void CR_Inventory( void )
 //	fprintf( stderr, "INVENTORY %u",nArg1);
 	WriteInstruction( "tax" );
 	WriteInstruction( "jsr minve" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Kill( void )
 {
-	WriteInstruction( "lda #1" );						/* player dead flag. */
+//	WriteInstruction( "lda #1" );						/* player dead flag. */
+	LoadARegister(1);
 	WriteInstruction( "sta deadf" );						/* set to non-zero. */
 }
 
@@ -3880,8 +3974,9 @@ void CR_AddSubtract( void )
 		}
 		else
 		{
-			WriteInstruction( "lda #" );					/* put number to add/subtract into c register. */
-			WriteNumber( nArg );
+		//	WriteInstruction( "lda #" );					/* put number to add/subtract into c register. */
+		//	WriteNumber( nArg );
+			LoadARegister(nArg);
 			WriteInstruction( "sta z80_c" );					/* put number to add/subtract into c register. */
 		}
 	}
@@ -3944,43 +4039,60 @@ void CR_Display( void )
 			WriteInstruction( "jsr disply" );
 			break;
 	}
+
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_ScreenUp( void )
 {
 	WriteInstruction( "jsr scru" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_ScreenDown( void )
 {
 	WriteInstruction( "jsr scrd" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_ScreenLeft( void )
 {
 	WriteInstruction( "jsr scrl" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_ScreenRight( void )
 {
 	WriteInstruction( "jsr scrr" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_WaitKey( void )
 {
 	WriteInstruction( "jsr prskey" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Jump( void )
 {
 	WriteInstruction( "jsr jump" );
 	nGravity++;
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Fall( void )
 {
 	WriteInstruction( "jsr ifall" );
 	nGravity++;
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Other( void )
@@ -3989,6 +4101,7 @@ void CR_Other( void )
 	WriteInstruction( "sta z80_x" );
 	WriteInstruction( "lda skptr+1" );
 	WriteInstruction( "sta z80_i" );
+	InvalidateARegister();
 }
 
 void CR_Spawned( void )
@@ -3997,6 +4110,7 @@ void CR_Spawned( void )
 	WriteInstruction( "sta z80_x" );
 	WriteInstruction( "lda spptr+1" );
 	WriteInstruction( "sta z80_i" );
+	InvalidateARegister();
 }
 
 void CR_Original( void )
@@ -4005,11 +4119,13 @@ void CR_Original( void )
 	WriteInstruction( "sta z80_x" );
 	WriteInstruction( "lda ogptr+1" );
 	WriteInstruction( "sta z80_i" );
+	InvalidateARegister();
 }
 
 void CR_EndGame( void )
 {
-	WriteInstruction( "lda #1" );
+//	WriteInstruction( "lda #1" );
+	LoadARegister(1);
 	WriteInstruction( "sta gamwon" );
 }
 
@@ -4017,6 +4133,8 @@ void CR_Get( void )
 {
 	CompileArgument();
 	WriteInstruction( "jsr getob" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Put( void )
@@ -4035,18 +4153,23 @@ void CR_Put( void )
 	WriteInstruction( "sta dispy" );							/* remember object number. */
 	CompileArgument();
 	WriteInstruction( "jsr drpob" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_RemoveObject( void )
 {
 	CompileArgument();
 	WriteInstruction( "jsr remob" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_DetectObject( void )
 {
 	WriteInstruction( "jsr skobj" );
 	WriteInstruction( "sta varobj" );
+	InvalidateARegister();
 }
 
 void CR_Asm( void )											/* this is undocumented as it's dangerous! */
@@ -4143,6 +4266,7 @@ void CR_Trail( void )
 {
 	WriteInstruction( "jsr vapour" );
 //	WriteInstruction( "; VAPOUR command" );
+	InvalidateARegister();
 }
 
 void CR_Laser( void )
@@ -4150,6 +4274,7 @@ void CR_Laser( void )
 	CompileArgument();										/* 0 or 1 for direction. */
 	WriteInstruction( "jsr shoot" );
 //	WriteInstruction( "; LASER command" );
+	InvalidateARegister();
 }
 
 void CR_Star( void )
@@ -4162,6 +4287,8 @@ void CR_Star( void )
 	WriteInstruction( "jsr star" );
 	WriteText( "\n:" );
 //	WriteInstruction( "; STAR command" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Explode( void )
@@ -4169,11 +4296,15 @@ void CR_Explode( void )
 	CompileArgument();										/* number of particles required. */
 	WriteInstruction( "jsr explod" );
 //	WriteInstruction( "; EXPLODE command" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Redraw( void )
 {
 	WriteInstruction( "jsr redraw" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Silence( void )
@@ -4216,8 +4347,9 @@ void CR_GetBlock( void )
 //		}
 //		else
 //		{
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg1 );							/* first argument in c register. */
+		///	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg1 );							/* first argument in c register. */
+			LoadARegister(nArg1);
 			WriteInstruction( "sta dispx" );
 			CompileKnownArgument( nArg2 );					/* puts argument into accumulator. */
 			WriteInstruction( "sta dispy" );					/* put that into b. */
@@ -4234,6 +4366,7 @@ void CR_GetBlock( void )
 //	WriteInstruction( "ld (dispx),hl" );					/* set the test coordinates. */
 	WriteInstruction( "jsr tstbl" );						/* get block there. */
 	WriteInstruction( "sta varblk" );					/* write to block variable. */
+	InvalidateARegister();
 }
 
 void CR_Read( void )
@@ -4250,6 +4383,7 @@ void CR_Read( void )
 	{
 		CR_PamC( nAnswerWantedHere );						/* put accumulator in variable or sprite parameter. */
 	}
+	InvalidateARegister();
 }
 
 void CR_Data( void )
@@ -4362,6 +4496,9 @@ void CR_Data( void )
 	{
 		Error( "No data found" );
 	}
+
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Restore( void )
@@ -4372,14 +4509,17 @@ void CR_Restore( void )
 
 	if ( SpriteEvent() )
 	{
-		WriteInstruction( "lda #0" );				/* set data pointer to beyond range. */
+	//	WriteInstruction( "lda #0" );				/* set data pointer to beyond range. */
+		LoadARegister(0);
 	//	WriteInstruction( "ldy #16" );
-		LoadYRegister(16);
-		WriteInstruction( "sta (z80_ix),y" );
+	//	LoadYRegister(16);
+	//	WriteInstruction( "sta (z80_ix),y" );
+		SaveSpriteParameter(16);
 	}
 	else
 	{
-		WriteInstruction( "lda #0" );
+	//	WriteInstruction( "lda #0" );
+		LoadARegister(0);
 		sprintf( szInstruction, "sta rptr%02d", nEvent );
 		WriteInstruction( szInstruction );
 	}
@@ -4407,6 +4547,7 @@ void CR_ParticleUp( void )
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #1" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_ParticleDown( void )
@@ -4417,6 +4558,7 @@ void CR_ParticleDown( void )
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #1" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_ParticleLeft( void )
@@ -4427,6 +4569,7 @@ void CR_ParticleLeft( void )
 	WriteInstruction( "sec" );
 	WriteInstruction( "sbc #1" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_ParticleRight( void )
@@ -4437,6 +4580,7 @@ void CR_ParticleRight( void )
 	WriteInstruction( "clc" );
 	WriteInstruction( "adc #1" );
 	WriteInstruction( "sta (z80_ix),y" );
+	InvalidateARegister();
 }
 
 void CR_ParticleTimer( void )
@@ -4450,6 +4594,8 @@ void CR_ParticleTimer( void )
 	WriteInstruction( "bne :+" );
 	WriteInstruction( "jmp trailk" );						/* reached zero, kill it off. */
 	WriteText( "\n:" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_StartParticle( void )
@@ -4460,26 +4606,34 @@ void CR_StartParticle( void )
 	WriteInstruction( "pha" );
 	CompileArgument();										/* palette register to write. */
 	WriteInstruction( "jsr ptusr" );
+	InvalidateYRegister();
 	WriteInstruction( "pla" );
 	WriteInstruction( "sta z80_x" );
 	WriteInstruction( "pla" );
 	WriteInstruction( "sta z80_i" );
+	InvalidateARegister();
 }
 
 void CR_Message( void )
 {
 	CompileArgument();										/* message number to display. */
 	WriteInstruction( "jsr dmsg" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_StopFall( void )
 {
 	WriteInstruction( "jsr gravst" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_GetBlocks( void )
 {
 	WriteInstruction( "jsr getcol" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Plot( void )
@@ -4494,17 +4648,20 @@ void CR_Plot( void )
 		if ( nArg2 == INS_NUM )								/* second argument is numeric too. */
 		{
 			nArg2 = GetNum( 8 );
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg1 );
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg1 );
+			LoadARegister(nArg1);
 			WriteInstruction( "sta dispx" );
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg2 );							/* pass both parameters as 16-bit argument. */
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg2 );							/* pass both parameters as 16-bit argument. */
+			LoadARegister(nArg2);
 			WriteInstruction( "sta dispy" );
 		}
 		else
 		{
-			WriteInstruction( "lda #" );
-			WriteNumber( nArg1 );							/* first argument in c register. */
+		//	WriteInstruction( "lda #" );
+		//	WriteNumber( nArg1 );							/* first argument in c register. */
+			LoadARegister(nArg1);
 			WriteInstruction( "sta dispx" );
 			CompileKnownArgument( nArg2 );					/* puts argument into accumulator. */
 			WriteInstruction( "sta dispy" );
@@ -4520,22 +4677,29 @@ void CR_Plot( void )
 
 	WriteInstruction( "jsr plot0" );						/* plot the pixel. */
 	WriteText( "\n");
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_UndoSpriteMove( void )
 {
 //	WriteInstruction( "ldy #3" );
-	LoadYRegister(3);
-	WriteInstruction( "lda (z80_ix),y" );
+//	LoadYRegister(3);
+//	WriteInstruction( "lda (z80_ix),y" );
+	LoadSpriteParameter(3);
 //	WriteInstruction( "ldy #8" );
-	LoadYRegister(8);
-	WriteInstruction( "sta (z80_ix),y" );
+//	LoadYRegister(8);
+//	WriteInstruction( "sta (z80_ix),y" );
+	SaveSpriteParameter(8);
 //	WriteInstruction( "ldy #4" );
-	LoadYRegister(4);
-	WriteInstruction( "lda (z80_ix),y" );
+//	LoadYRegister(4);
+//	WriteInstruction( "lda (z80_ix),y" );
+	LoadSpriteParameter(4);
 //	WriteInstruction( "ldy #9" );
-	LoadYRegister(9);
-	WriteInstruction( "sta (z80_ix),y" );
+//	LoadYRegister(9);
+//	WriteInstruction( "sta (z80_ix),y" );
+	SaveSpriteParameter(9);
+	InvalidateARegister();
 }
 
 void CR_Ticker( void )
@@ -4557,11 +4721,13 @@ void CR_Ticker( void )
 			if ( nArg2 == INS_STR )							/* second argument should be a string. */
 			{
 				nArg2 = nMessageNumber++;
-				WriteInstruction( "lda #" );
-				WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
+			//	WriteInstruction( "lda #" );
+			//	WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
+				LoadARegister(nArg1);
 				WriteInstruction( "sta z80_c" );
-				WriteInstruction( "lda #" );
-				WriteNumber( nArg2 );						/* pass both parameters as 16-bit argument. */
+			//	WriteInstruction( "lda #" );
+			//	WriteNumber( nArg2 );						/* pass both parameters as 16-bit argument. */
+				LoadARegister(nArg2);
 				WriteInstruction( "sta z80_b" );
 				WriteInstruction( "jsr iscrly" );
 			}
@@ -4570,11 +4736,13 @@ void CR_Ticker( void )
 				if ( nArg2 == INS_NUM )						/* if not a string, must be a message number. */
 				{
 					nArg2 = GetNum( 8 );
-					WriteInstruction( "lda #" );
-					WriteNumber( nArg2 );					/* pass both parameters as 16-bit argument. */
+				//	WriteInstruction( "lda #" );
+				//	WriteNumber( nArg2 );					/* pass both parameters as 16-bit argument. */
+					LoadARegister(nArg2);
 					WriteInstruction( "sta z80_c" );
-					WriteInstruction( "lda #" );
-					WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
+				//	WriteInstruction( "lda #" );
+				//	WriteNumber( nArg1 );						/* pass both parameters as 16-bit argument. */
+					LoadARegister(nArg1);
 					WriteInstruction( "sta z80_b" );
 					WriteInstruction( "jsr iscrly" );
 				}
@@ -4594,6 +4762,9 @@ void CR_Ticker( void )
 		WriteInstruction( "jsr iscrly" );
 	}
 //		WriteInstruction( "; TICKER" );
+
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_User( void )
@@ -4616,6 +4787,8 @@ void CR_User( void )
 	}
 
 	WriteInstruction( "jsr user" );
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 void CR_Event( void )
@@ -5547,15 +5720,16 @@ void CR_Pam( unsigned short int nParam )
 /****************************************************************************************************************/
 void CR_ArgA( short int nNum )
 {
-	if ( nNum == 0 )
-	{
-		WriteInstruction( "lda #0" );
-	}
-	else
-	{
-		WriteInstruction( "lda #" );
-		WriteNumber( nNum );
-	}
+//	if ( nNum == 0 )
+//	{
+//		WriteInstruction( "lda #0" );
+//	}
+//	else
+//	{
+//		WriteInstruction( "lda #" );
+//		WriteNumber( nNum );
+//	}
+	LoadARegister(nNum);
 }
 
 void CR_ArgB( short int nNum )
@@ -5577,9 +5751,11 @@ void CR_PamA( short int nNum )
 	else													/* load accumulator with sprite parameter. */
 	{
 	//	WriteInstructionArg( "ldy #?", nNum - IDIFF );
-		LoadYRegister(nNum - IDIFF);
-		WriteInstruction( "lda (z80_ix),y" );
+	//	LoadYRegister(nNum - IDIFF);
+	//	WriteInstruction( "lda (z80_ix),y" );
+		LoadSpriteParameter(nNum - IDIFF);
 	}
+	InvalidateARegister();
 }
 
 void CR_PamB( short int nNum )
@@ -5618,8 +5794,9 @@ void CR_PamC( short int nNum )
 	else													/* compare accumulator with sprite parameter. */
 	{
 	//	WriteInstructionArg( "ldy #?", nNum - IDIFF );
-		LoadYRegister(nNum - IDIFF);
-		WriteInstruction( "sta (z80_ix),y" );
+	//	LoadYRegister(nNum - IDIFF);
+	//	WriteInstruction( "sta (z80_ix),y" );
+		SaveSpriteParameter(nNum - IDIFF);
 	}
 }
 
@@ -5708,24 +5885,32 @@ void WriteJPNZ( void )
 	switch ( nLastOperator )
 	{
 		case OPE_NOT:
+#ifdef _ENABLE_BRANCH_OPTIMISATION
+			WriteInstruction("beq xxxxxx");
+#else
 			WriteInstruction( "bne *+5" );
 			WriteInstruction( "jmp xxxxxx" );
-		//	WriteInstruction("beq xxxxxx");
+#endif
 			break;
 		case OPE_GRTEQU:
 			WriteInstruction( "beq *+4" );					/* test succeeded, skip jp nc instruction */
 			WriteInstruction( "bcs xxxxxx" );
-		//	WriteInstruction("bne xxxxxx");
 			break;
 		case OPE_GRT:
+#ifdef _ENABLE_BRANCH_OPTIMISATION
+			WriteInstruction("bcs xxxxxx");
+#else
 			WriteInstruction( "bcc *+5" );
 			WriteInstruction( "jmp xxxxxx" );
-		//	WriteInstruction("bcs xxxxxx");
+#endif
 			break;
 		case OPE_LESEQU:
+#ifdef _ENABLE_BRANCH_OPTIMISATION
+			WriteInstruction("bcc xxxxxx");
+#else
 			WriteInstruction( "bcs *+5" );
 			WriteInstruction( "jmp xxxxxx" );
-		//	WriteInstruction("bcc xxxxxx");
+#endif
 			break;
 		case OPE_LES:
 			WriteInstruction( "bcc *+4");
@@ -5743,9 +5928,12 @@ void WriteJPNZ( void )
 			break;
 		case OPE_EQU:
 		default:
+#ifdef _ENABLE_BRANCH_OPTIMISATION
+			WriteInstruction("bne xxxxxx");
+#else
 			WriteInstruction( "beq *+5" );
 			WriteInstruction( "jmp xxxxxx" );
-		//	WriteInstruction("bne xxxxxx");
+#endif
 			break;
 	}
 }
@@ -5848,6 +6036,7 @@ void WriteLabel( unsigned short int nWhere )
 	}
 
 	InvalidateYRegister();
+	InvalidateARegister();
 }
 
 void NewLine( void )
@@ -5882,24 +6071,22 @@ void Error( unsigned char *cMsg )
 	nErrors++;
 }
 
-#define _ENABLE_Y_OPTIMISATION true
-
 void LoadYRegister(unsigned short Yvalue)
 {
-#if _ENABLE_Y_OPTIMISATION
-	char cline[256];
-	sprintf(cline, "; ldy #%d", Yvalue);
-	WriteInstruction(cline);
-
+#ifdef _ENABLE_Y_OPTIMISATION
 	if (Yvalue != previousYvalue)
 	{
 		if (Yvalue == previousYvalue - 1)
 		{
-			WriteInstruction("dey");
+			char cline[256];
+			sprintf(cline, "dey; ldy #%d", Yvalue);
+			WriteInstruction(cline);
 		}
 		else if (Yvalue == previousYvalue + 1)
 		{
-			WriteInstruction("iny");
+			char cline[256];
+			sprintf(cline, "iny; ldy #%d", Yvalue);
+			WriteInstruction(cline);
 		}
 		else
 		{
@@ -5907,6 +6094,12 @@ void LoadYRegister(unsigned short Yvalue)
 		}
 
 		previousYvalue = Yvalue;
+	}
+	else
+	{
+		char cline[256];
+		sprintf(cline, "; ldy #%d", Yvalue);
+		WriteInstruction(cline);
 	}
 #else
 	WriteInstructionArg("ldy #?", Yvalue);
@@ -5916,4 +6109,63 @@ void LoadYRegister(unsigned short Yvalue)
 void InvalidateYRegister(void)
 {
 	previousYvalue = 1000;
+}
+
+//#define _ENABLE_SPRITE_OPTIMISATION
+
+void LoadSpriteParameter(unsigned short sparam)
+{
+#ifdef _ENABLE_SPRITE_OPTIMISATION
+	char cline[256];
+	sprintf(cline, "lda sprtab + %d,y", sparam);
+	WriteInstruction(cline);
+#else
+	LoadYRegister(sparam);
+	WriteInstruction("lda (z80_ix),y");
+#endif
+}
+
+void SaveSpriteParameter(unsigned short sparam)
+{
+#ifdef _ENABLE_SPRITE_OPTIMISATION
+	char cline[256];
+	sprintf(cline, "sta sprtab + %d,y", sparam);
+	WriteInstruction(cline);
+#else
+	LoadYRegister(sparam);
+	WriteInstruction("sta (z80_ix),y");
+#endif
+}
+
+void LoadARegister(unsigned short Avalue)
+{
+#ifdef _ENABLE_A_OPTIMISATION
+	if (Avalue != previousAvalue)
+	{
+		if (Avalue == previousYvalue)
+		{
+			char cline[256];
+			sprintf(cline, "tya; lda #%d", Avalue);
+			WriteInstruction(cline);
+		}
+		else
+		{
+			WriteInstructionArg("lda #?", Avalue);
+		}
+		previousAvalue = Avalue;
+	}
+	else
+	{
+		char cline[256];
+		sprintf(cline, "; lda #%d", Avalue);
+		WriteInstruction(cline);
+	}
+#else
+	WriteInstructionArg("lda #?", Avalue);
+#endif
+}
+
+void InvalidateARegister(void)
+{
+	previousAvalue = 1000;
 }

@@ -1367,6 +1367,9 @@ void StartEvent( unsigned short int nEvent )
 		nWhileBuff[ nCount ][ 1 ] = 0;
 		nWhileBuff[ nCount ][ 2 ] = 0;
 	}
+
+	InvalidateARegister();
+	InvalidateYRegister();
 }
 
 /* Build our object file */

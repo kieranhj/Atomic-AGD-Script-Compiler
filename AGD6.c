@@ -148,14 +148,7 @@ enum
 	INS_ANIM,
 	INS_ANIMBACK,
 	INS_PUTBLOCK,
-//	INS_DIGUP,
-//	INS_DIGDOWN,
-//	INS_DIGLEFT,
-//	INS_DIGRIGHT,
-//	INS_FILLUP,
-//	INS_FILLDOWN,
-//	INS_FILLLEFT,
-//	INS_FILLRIGHT,
+	INS_DIG,
 	INS_NEXTLEVEL,
 	INS_RESTART,
 	INS_SPAWN,
@@ -366,14 +359,7 @@ void CR_Collision( void );
 void CR_Anim( void );
 void CR_AnimBack( void );
 void CR_PutBlock( void );
-//void CR_DigUp( void );
-//void CR_DigDown( void );
-//void CR_DigLeft( void );
-//void CR_DigRight( void );
-//void CR_FillUp( void );
-//void CR_FillDown( void );
-//void CR_FillLeft( void );
-//void CR_FillRight( void );
+void CR_Dig( void );
 void CR_NextLevel( void );
 void CR_Restart( void );
 void CR_Spawn( void );
@@ -593,15 +579,8 @@ unsigned const char *keywrd =
 	"LET."			// x=y.
 	"ANIMATE."		// animate sprite.
 	"ANIMBACK."		// animate sprite backwards.
-//	"DIGUP."		// dig up.
-//	"DIGDOWN."		// dig down.
-//	"DIGLEFT."		// dig left.
-//	"DIGRIGHT."		// dig right.
-//	"FILLUP."		// fill up.
-//	"FILLDOWN."		// fill down.
-//	"FILLLEFT."		// fill left.
-//	"FILLRIGHT."		// fill right.
 	"PUTBLOCK."		// put block on screen.
+	"DIG."			// dig.
 	"NEXTLEVEL."		// next level.
 	"RESTART."		// restart game.
 	"SPAWN."		// spawn new sprite.
@@ -2419,30 +2398,9 @@ void Compile( unsigned short int nInstruction )
 		case INS_PUTBLOCK:
 			CR_PutBlock();
 			break;
-//		case INS_DIGUP:
-//			CR_DigUp();
-//			break;
-//		case INS_DIGDOWN:
-//			CR_DigDown();
-//			break;
-//		case INS_DIGLEFT:
-//			CR_DigLeft();
-//			break;
-//		case INS_DIGRIGHT:
-//			CR_DigRight();
-//			break;
-//		case INS_FILLUP:
-//			CR_FillUp();
-//			break;
-//		case INS_FILLDOWN:
-//			CR_FillDown();
-//			break;
-//		case INS_FILLLEFT:
-//			CR_FillLeft();
-//			break;
-//		case INS_FILLRIGHT:
-//			CR_FillRight();
-//			break;
+		case INS_DIG:
+			CR_Dig();
+			break;
 		case INS_NEXTLEVEL:
 			CR_NextLevel();
 			break;
@@ -3221,9 +3179,9 @@ void CompileShift( short int nArg )
 				WriteInstruction( "lsr a" );
 				break;
 			case 128:
-				WriteInstruction( "lsr a" );
+				WriteInstruction( "asl a" );
 				WriteInstruction( "rol a" );
-				WriteInstruction( "and 1" );
+				WriteInstruction( "and #1" );
 				break;
 		}
 	}
@@ -3426,61 +3384,11 @@ void CR_PutBlock( void )
 	WriteInstruction( "jsr pattr" );
 }
 
-//void CR_DigUp( void )
-//{
-//	WriteInstruction( "jsr digu" );
-//}
-
-//void CR_DigDown( void )
-//{
-//	WriteInstruction( "jsr digd" );
-//}
-
-//void CR_DigLeft( void )
-//{
-//	WriteInstruction( "jsr digl" );
-//}
-
-//void CR_DigRight( void )
-//{
-//	WriteInstruction( "jsr digr" );
-//}
-
-//void CR_FillUp( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call fillu" );
-//}
-
-//void CR_FillDown( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call filld" );
-//}
-
-//void CR_FillLeft( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call filll" );
-//}
-
-//void CR_FillRight( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call fillr" );
-//}
+void CR_Dig( void )
+{
+	CompileArgument();
+	WriteInstruction( "jsr dig" );
+}
 
 void CR_NextLevel( void )
 {

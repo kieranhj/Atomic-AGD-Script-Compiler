@@ -233,10 +233,11 @@ enum
 	INS_MESSAGE,
 	INS_STOPFALL,
 	INS_GETBLOCKS,
+	INS_CONTROLMENU,
 	INS_DOUBLEDIGITS,
 	INS_TRIPLEDIGITS,
 	INS_CLOCK,
-	
+
 	CMP_EVENT,
 	CMP_DEFINEBLOCK,
 	CMP_DEFINEWINDOW,
@@ -441,6 +442,7 @@ void CR_StartParticle( void );
 void CR_Message( void );
 void CR_StopFall( void );
 void CR_GetBlocks( void );
+void CR_ControlMenu( void );
 void CR_Event( void );
 void CR_DefineBlock( void );
 void CR_DefineWindow( void );
@@ -665,6 +667,7 @@ unsigned const char *keywrd =
 	"MESSAGE."			// display a message.
 	"STOPFALL."			// stop falling.
 	"GETBLOCKS."		// get collectable blocks.
+	"CONTROLMENU."		// controlmenu
 	"DOUBLEDIGITS."		// show as double digits.
 	"TRIPLEDIGITS."		// show as triple digits.
 	"SECONDS."			// show as timer.
@@ -2652,6 +2655,9 @@ void Compile( unsigned short int nInstruction )
 		case INS_GETBLOCKS:
 			CR_GetBlocks();
 			break;
+		case INS_CONTROLMENU:
+			CR_ControlMenu();
+			break;
 		case CMP_EVENT:
 			CR_Event();
 			break;
@@ -4394,6 +4400,28 @@ void CR_StopFall( void )
 void CR_GetBlocks( void )
 {
 	WriteInstruction( "jsr getcol" );
+}
+
+void CR_ControlMenu( void )
+{
+	WriteInstruction( "rtcon:" );
+	WriteInstruction( "jsr vsync" );
+	WriteInstruction( "lda #0" );
+	WriteInstruction( "sta contrl" );
+	WriteInstruction( "lda keys+7" );
+	WriteInstruction( "jsr ktest" );
+	WriteInstruction( "bcc rtcon1" );
+	WriteInstruction( "lda #1" );
+	WriteInstruction( "sta contrl" );
+	WriteInstruction( "lda keys+8" );
+	WriteInstruction( "jsr ktest" );
+	WriteInstruction( "bcc rtcon1" );
+	WriteInstruction( "lda #2" );
+	WriteInstruction( "sta contrl" );
+	WriteInstruction( "lda keys+9" );
+	WriteInstruction( "jsr ktest" );
+	WriteInstruction( "bcs rtcon" );
+	WriteInstruction( "rtcon1:" );
 }
 
 void CR_Plot( void )

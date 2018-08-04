@@ -4404,7 +4404,7 @@ void CR_GetBlocks( void )
 
 void CR_ControlMenu( void )
 {
-	WriteInstruction( "rtcon:" );
+	WriteInstruction( "\nrtcon:" );
 	WriteInstruction( "jsr vsync" );
 	WriteInstruction( "lda #0" );
 	WriteInstruction( "sta contrl" );

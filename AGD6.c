@@ -4,8 +4,8 @@
 /*   Atom version written by Kees van Oss 2018             */
 
 //#define _ENABLE_BRANCH_OPTIMISATION
-#define _ENABLE_A_OPTIMISATION
-#define _ENABLE_Y_OPTIMISATION
+//#define _ENABLE_A_OPTIMISATION
+//#define _ENABLE_Y_OPTIMISATION
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1557,14 +1557,14 @@ void CreateBlocks( void )
 	}
 	while ( ( cSrc - cBuff ) < lSize );
 
-//	/* Now do the block attributes. */
-//	WriteText( "\nbcol:" );
-//	nData = 0;
-//	while ( nData < nCounter )
-//	{
-//		WriteText( "\n        .byte " );
-//		WriteNumber( nAttr[ nData++ ] );
-//	}
+	/* Now do the block attributes. */
+	WriteText( "\nbcol:" );
+	nData = 0;
+	while ( nData < nCounter )
+	{
+		WriteText( "\n        .byte " );
+		WriteNumber( nAttr[ nData++ ] );
+	}
 
 	/* Now do the block properties. */
 	WriteText( "\nbprop:" );
@@ -1607,7 +1607,7 @@ void CreateSprites( void )
 
 		for ( nFrame = 0; nFrame < cFrames[ nCounter ]; nFrame++ )
 		{
-			for ( nShifts = 0; nShifts < 4; nShifts++ )
+			for ( nShifts = 0; nShifts < 1; nShifts++ )
 			{
 				cSrc = cBufPos;
 				WriteText( "\n        .byte " );						/* start of text message */

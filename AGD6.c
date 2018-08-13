@@ -148,14 +148,7 @@ enum
 	INS_ANIM,
 	INS_ANIMBACK,
 	INS_PUTBLOCK,
-//	INS_DIGUP,
-//	INS_DIGDOWN,
-//	INS_DIGLEFT,
-//	INS_DIGRIGHT,
-//	INS_FILLUP,
-//	INS_FILLDOWN,
-//	INS_FILLLEFT,
-//	INS_FILLRIGHT,
+	INS_DIG,
 	INS_NEXTLEVEL,
 	INS_RESTART,
 	INS_SPAWN,
@@ -197,6 +190,8 @@ enum
 	INS_WAITKEY,
 	INS_JUMP,
 	INS_FALL,
+	INS_TABLEJUMP,
+	INS_TABLEFALL,
 	INS_OTHER,
 	INS_SPAWNED,
 	INS_ORIGINAL,
@@ -238,10 +233,11 @@ enum
 	INS_MESSAGE,
 	INS_STOPFALL,
 	INS_GETBLOCKS,
+	INS_CONTROLMENU,
 	INS_DOUBLEDIGITS,
 	INS_TRIPLEDIGITS,
 	INS_CLOCK,
-	
+
 	CMP_EVENT,
 	CMP_DEFINEBLOCK,
 	CMP_DEFINEWINDOW,
@@ -256,6 +252,7 @@ enum
 	CMP_DEFINEPALETTE,
 	CMP_DEFINEMESSAGES,
 	CMP_DEFINEFONT,
+	CMP_DEFINEJUMP,
 	CMP_DEFINECONTROLS,
 
 	CON_RIGHT,
@@ -330,6 +327,7 @@ void CreatePositions( void );
 void CreateObjects( void );
 void CreatePalette( void );
 void CreateFont( void );
+void CreateHopTable( void );
 void CreateKeyTable( void );
 unsigned short int NextKeyword( void );
 void CountLines( char cSrc );
@@ -362,14 +360,7 @@ void CR_Collision( void );
 void CR_Anim( void );
 void CR_AnimBack( void );
 void CR_PutBlock( void );
-//void CR_DigUp( void );
-//void CR_DigDown( void );
-//void CR_DigLeft( void );
-//void CR_DigRight( void );
-//void CR_FillUp( void );
-//void CR_FillDown( void );
-//void CR_FillLeft( void );
-//void CR_FillRight( void );
+void CR_Dig( void );
 void CR_NextLevel( void );
 void CR_Restart( void );
 void CR_Spawn( void );
@@ -408,6 +399,8 @@ void CR_ScreenRight( void );
 void CR_WaitKey( void );
 void CR_Jump( void );
 void CR_Fall( void );
+void CR_TableJump( void );
+void CR_TableFall( void );
 void CR_Other( void );
 void CR_Spawned( void );
 void CR_Original( void );
@@ -449,6 +442,7 @@ void CR_StartParticle( void );
 void CR_Message( void );
 void CR_StopFall( void );
 void CR_GetBlocks( void );
+void CR_ControlMenu( void );
 void CR_Event( void );
 void CR_DefineBlock( void );
 void CR_DefineWindow( void );
@@ -460,6 +454,7 @@ void CR_Map( void );
 void CR_DefinePalette( void );
 void CR_DefineMessages( void );
 void CR_DefineFont( void );
+void CR_DefineJump( void );
 void CR_DefineControls( void );
 unsigned char ConvertKey( short int nNum );
 
@@ -586,15 +581,8 @@ unsigned const char *keywrd =
 	"LET."			// x=y.
 	"ANIMATE."		// animate sprite.
 	"ANIMBACK."		// animate sprite backwards.
-//	"DIGUP."		// dig up.
-//	"DIGDOWN."		// dig down.
-//	"DIGLEFT."		// dig left.
-//	"DIGRIGHT."		// dig right.
-//	"FILLUP."		// fill up.
-//	"FILLDOWN."		// fill down.
-//	"FILLLEFT."		// fill left.
-//	"FILLRIGHT."		// fill right.
 	"PUTBLOCK."		// put block on screen.
+	"DIG."			// dig.
 	"NEXTLEVEL."		// next level.
 	"RESTART."		// restart game.
 	"SPAWN."		// spawn new sprite.
@@ -636,6 +624,8 @@ unsigned const char *keywrd =
 	"WAITKEY."			// wait for keypress.
 	"JUMP."				// jump.
 	"FALL."				// fall.
+	"TABLEJUMP."		// jump.
+	"TABLEFALL."		// fall.
 	"OTHER."			// select second collision sprite.
 	"SPAWNED."			// select spawned sprite.
 	"ENDSPRITE."		// select original sprite.
@@ -677,6 +667,7 @@ unsigned const char *keywrd =
 	"MESSAGE."			// display a message.
 	"STOPFALL."			// stop falling.
 	"GETBLOCKS."		// get collectable blocks.
+	"CONTROLMENU."		// controlmenu
 	"DOUBLEDIGITS."		// show as double digits.
 	"TRIPLEDIGITS."		// show as triple digits.
 	"SECONDS."			// show as timer.
@@ -696,6 +687,7 @@ unsigned const char *keywrd =
 	"DEFINEPALETTE."	// define palette.
 	"DEFINEMESSAGES."	// define messages.
 	"DEFINEFONT."		// define font.
+	"DEFINEJUMP."		// define jump table.
 	"DEFINECONTROLS."	// define key table.
 
 	/* Constants. */
@@ -833,6 +825,12 @@ unsigned char cDefaultPalette[] =
 
 unsigned char cDefaultFont[ 768 ];
 
+/* Hop/jump table. */
+unsigned char cDefaultHop[ 25 ] =
+{
+	248,250,252,254,254,255,255,255,0,0,0,1,1,1,2,2,4,6,8,8,8,99
+};
+
 unsigned char cDefaultKeys[ 11 ] =
 {
 	0x42,0x61,0x68,0x48,0x62,0x10,0x37,0x30,0x31,0x11,0x12
@@ -895,6 +893,7 @@ short int nStartScreen = -1;								/* starting screen. */
 unsigned char cMapWid = 0;									/* width of map. */
 short int nStartOffset = 0;									/* starting screen offset. */
 short int nUseFont = 1;										/* use custom font when non-zero. */
+short int nUseHopTable = 0;									/* use jump table when non-zero. */
 
 FILE *pObject;												/* output file. */
 FILE *pEngine;												/* engine source file. */
@@ -1277,6 +1276,7 @@ int main( int argc, const char* argv[] )
 	CreateObjects();
 	CreatePalette();
 	CreateFont();
+	CreateHopTable();
 	CreateKeyTable();
 
 	fwrite( cStart, 1, nCurrent - nAddress, pObject );
@@ -1974,6 +1974,26 @@ void CreateFont( void )
 	}
 }
 
+void CreateHopTable( void )
+{
+	short int nChar = 0;
+
+	WriteText( "\njtab:" );
+	nChar = 0;
+	WriteInstruction( ".byte " );
+
+	if ( nUseHopTable > 0 )
+	{
+		while ( cDefaultHop[ nChar ] != 99 )
+		{
+			WriteNumber( cDefaultHop[ nChar++ ] );
+			WriteText( "," );
+		}
+	}
+
+	WriteNumber( 99 );
+}
+
 void CreateKeyTable( void )
 {
 	short int nKey;
@@ -2385,30 +2405,9 @@ void Compile( unsigned short int nInstruction )
 		case INS_PUTBLOCK:
 			CR_PutBlock();
 			break;
-//		case INS_DIGUP:
-//			CR_DigUp();
-//			break;
-//		case INS_DIGDOWN:
-//			CR_DigDown();
-//			break;
-//		case INS_DIGLEFT:
-//			CR_DigLeft();
-//			break;
-//		case INS_DIGRIGHT:
-//			CR_DigRight();
-//			break;
-//		case INS_FILLUP:
-//			CR_FillUp();
-//			break;
-//		case INS_FILLDOWN:
-//			CR_FillDown();
-//			break;
-//		case INS_FILLLEFT:
-//			CR_FillLeft();
-//			break;
-//		case INS_FILLRIGHT:
-//			CR_FillRight();
-//			break;
+		case INS_DIG:
+			CR_Dig();
+			break;
 		case INS_NEXTLEVEL:
 			CR_NextLevel();
 			break;
@@ -2530,6 +2529,12 @@ void Compile( unsigned short int nInstruction )
 			break;
 		case INS_FALL:
 			CR_Fall();
+			break;
+		case INS_TABLEJUMP:
+			CR_TableJump();
+			break;
+		case INS_TABLEFALL:
+			CR_TableFall();
 			break;
 		case INS_OTHER:
 			CR_Other();
@@ -2654,6 +2659,9 @@ void Compile( unsigned short int nInstruction )
 		case INS_GETBLOCKS:
 			CR_GetBlocks();
 			break;
+		case INS_CONTROLMENU:
+			CR_ControlMenu();
+			break;
 		case CMP_EVENT:
 			CR_Event();
 			break;
@@ -2686,6 +2694,9 @@ void Compile( unsigned short int nInstruction )
 			break;
 		case CMP_DEFINEFONT:
 			CR_DefineFont();
+			break;
+		case CMP_DEFINEJUMP:
+			CR_DefineJump();
 			break;
 		case CMP_DEFINECONTROLS:
 			CR_DefineControls();
@@ -3383,61 +3394,11 @@ void CR_PutBlock( void )
 	WriteInstruction( "jsr pattr" );
 }
 
-//void CR_DigUp( void )
-//{
-//	WriteInstruction( "jsr digu" );
-//}
-
-//void CR_DigDown( void )
-//{
-//	WriteInstruction( "jsr digd" );
-//}
-
-//void CR_DigLeft( void )
-//{
-//	WriteInstruction( "jsr digl" );
-//}
-
-//void CR_DigRight( void )
-//{
-//	WriteInstruction( "jsr digr" );
-//}
-
-//void CR_FillUp( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call fillu" );
-//}
-
-//void CR_FillDown( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call filld" );
-//}
-
-//void CR_FillLeft( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call filll" );
-//}
-
-//void CR_FillRight( void )
-//{
-//	unsigned short int nNum = NumberOnly();
-//
-//	WriteInstruction( "ld b," );
-//	WriteNumber( nNum );
-//	WriteInstruction( "call fillr" );
-//}
+void CR_Dig( void )
+{
+	CompileArgument();
+	WriteInstruction( "jsr dig" );
+}
 
 void CR_NextLevel( void )
 {
@@ -3928,12 +3889,28 @@ void CR_Jump( void )
 {
 	WriteInstruction( "jsr jump" );
 	nGravity++;
+	nUseHopTable++;
 }
 
 void CR_Fall( void )
 {
 	WriteInstruction( "jsr ifall" );
 	nGravity++;
+	nUseHopTable++;
+}
+
+void CR_TableJump( void )
+{
+	WriteInstruction( "jsr jump" );
+	nGravity++;
+	nUseHopTable++;
+}
+
+void CR_TableFall( void )
+{
+	WriteInstruction( "jsr ifall" );
+	nGravity++;
+	nUseHopTable++;
 }
 
 void CR_Other( void )
@@ -4427,6 +4404,28 @@ void CR_StopFall( void )
 void CR_GetBlocks( void )
 {
 	WriteInstruction( "jsr getcol" );
+}
+
+void CR_ControlMenu( void )
+{
+	WriteInstruction( "\nrtcon:" );
+	WriteInstruction( "jsr vsync" );
+	WriteInstruction( "lda #0" );
+	WriteInstruction( "sta contrl" );
+	WriteInstruction( "lda keys+7" );
+	WriteInstruction( "jsr ktest" );
+	WriteInstruction( "bcc rtcon1" );
+	WriteInstruction( "lda #1" );
+	WriteInstruction( "sta contrl" );
+	WriteInstruction( "lda keys+8" );
+	WriteInstruction( "jsr ktest" );
+	WriteInstruction( "bcc rtcon1" );
+	WriteInstruction( "lda #2" );
+	WriteInstruction( "sta contrl" );
+	WriteInstruction( "lda keys+9" );
+	WriteInstruction( "jsr ktest" );
+	WriteInstruction( "bcs rtcon" );
+	WriteInstruction( "rtcon1:" );
 }
 
 void CR_Plot( void )
@@ -5031,6 +5030,39 @@ void CR_DefineFont( void )
 			nUseFont = 0;
 		}
 	}
+}
+
+void CR_DefineJump( void )
+{
+	unsigned short int nArg;
+	unsigned short int nNum = 0;
+	short int nByte = 0;
+
+	while ( nNum != 99 )
+	{
+		nArg = NextKeyword();
+		if ( nArg == INS_NUM )
+		{
+			nNum = ( unsigned char )GetNum( 8 );
+			cDefaultHop[ nByte ] = nNum;
+			if ( nByte < 25 )
+			{
+				nByte++;
+			}
+			else
+			{
+				Error( "DEFINEJUMP table too big" );
+				nNum = 99;
+			}
+		}
+		else
+		{
+			Error( "DEFINEJUMP missing 99 end marker" );
+			nNum = 99;
+		}
+	}
+
+	cDefaultHop[ 24 ] = 99;
 }
 
 void CR_DefineControls( void )

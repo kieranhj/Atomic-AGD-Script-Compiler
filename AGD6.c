@@ -6,6 +6,7 @@
 //#define _ENABLE_BRANCH_OPTIMISATION
 //#define _ENABLE_A_OPTIMISATION
 //#define _ENABLE_Y_OPTIMISATION
+#define _ENABLE_MODE1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1522,6 +1523,53 @@ void CreateMessages( void )
 	WriteText("\n.out .sprintf(\"MESSAGE SIZE = %d\", (* - msgdat))\n");
 }
 
+#ifdef _ENABLE_MODE1
+unsigned char ink_to_mode1[8][2] =
+{
+	{ 0x00, 0x00 },	// solid 0
+	{ 0x0f, 0x0f },	// solid 1
+	{ 0xf0, 0xf0 }, // solid 2
+	{ 0x5a, 0xa5 }, // stipple 1,2
+	{ 0xda, 0xa7 }, // stripple 1,2,3
+	{ 0x5f, 0xaf }, // stipple 1,3
+	{ 0xf5, 0xfa }, // stipple 2,3
+	{ 0xff, 0xff }, // solid 3
+};
+
+
+void ConvertToMode1(unsigned char pixels, unsigned char attribute, unsigned char parity)
+{
+	unsigned char ink = attribute & 7;
+	unsigned char paper = (attribute >> 3) & 7;
+
+//	printf("Pixels = 0x%0x with attribute = %d ink = %d paper = %d\n", pixels, attribute, ink, paper);
+
+	unsigned char left_pixels = (pixels & 0xf0) >> 4;
+	unsigned char right_pixels = pixels & 0xf;
+
+	left_pixels = left_pixels | (left_pixels << 4);
+	right_pixels = right_pixels | (right_pixels << 4);
+
+//	printf("Left = %0x Right = 0x%x\n", left_pixels, right_pixels);
+
+	unsigned char background = pixels ^ 0xff;
+
+	unsigned char left_back = (background & 0xf0) >> 4;
+	unsigned char right_back = background & 0xf;
+
+	left_back = left_back | (left_back << 4);
+	right_back = right_back | (right_back << 4);
+
+//	printf("Left = %0x Right = 0x%x\n", left_back, right_back);
+	
+	// Need to also include paper pixels...
+
+	WriteNumber((ink_to_mode1[ink][parity] & left_pixels) | (ink_to_mode1[paper][parity] & left_back));
+	WriteText(",");								/* put a comma */
+	WriteNumber((ink_to_mode1[ink][parity] & right_pixels) | (ink_to_mode1[paper][parity] & right_back));
+}
+#endif
+
 void CreateBlocks( void )
 {
 	short int nData;
@@ -1545,26 +1593,39 @@ void CreateBlocks( void )
 		WriteText( "\n        .byte " );						/* start of text message */
 		nData = 0;
 		cType[ nCounter ] = *cSrc++;						/* store type in array */
+#ifdef _ENABLE_MODE1
+		unsigned char attribute = *(cSrc + 8);
+		unsigned char parity = 0;
+#endif
 		while ( nData++ < 7 )
 		{
-			WriteNumber( *cSrc++ );							/* write byte of data */
+#ifdef _ENABLE_MODE1
+			ConvertToMode1(*cSrc++, attribute, parity);
+			parity ^= 1;
+#else
+			WriteNumber(*cSrc++);							/* write byte of data */
+#endif
 			WriteText( "," );								/* put a comma */
 		}
 
+#ifdef _ENABLE_MODE1
+		ConvertToMode1(*cSrc++, attribute, parity);
+#else
 		WriteNumber( *cSrc++ );								/* write final byte of graphic data */
+#endif
 		nAttr[ nCounter ] = *cSrc++;						/* store attribute in array */
 		nCounter++;
 	}
 	while ( ( cSrc - cBuff ) < lSize );
 
 	/* Now do the block attributes. */
-	WriteText( "\nbcol:" );
-	nData = 0;
-	while ( nData < nCounter )
-	{
-		WriteText( "\n        .byte " );
-		WriteNumber( nAttr[ nData++ ] );
-	}
+//	WriteText( "\nbcol:" );
+//	nData = 0;
+//	while ( nData < nCounter )
+//	{
+//		WriteText( "\n        .byte " );
+//		WriteNumber( nAttr[ nData++ ] );
+//	}
 
 	/* Now do the block properties. */
 	WriteText( "\nbprop:" );

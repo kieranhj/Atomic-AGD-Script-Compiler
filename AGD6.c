@@ -844,7 +844,7 @@ unsigned char cDefaultHop[ 25 ] =
 
 unsigned char cDefaultKeys[ 11 ] =
 {
-	0x42,0x61,0x68,0x48,0x62,0x10,0x37,0x30,0x31,0x11,0x12
+	0x42,0x61,0x68,0x48,0x49,0x10,0x37,0x30,0x31,0x11,0x12
 };
 
 const unsigned char cKeyOrder[ 11 ] =
@@ -1476,7 +1476,7 @@ void CreateMessages( void )
 	{
 		while ( *cSrc < 128 )								/* end marker? */
 		{
-			if ( *cSrc == 13 || *cSrc == 39 )
+			if ( *cSrc < 32 || *cSrc == 39 )
 			{
 				if ( nStart )
 				{
@@ -1486,7 +1486,8 @@ void CreateMessages( void )
 				{
 					WriteText( "\"," );						/* end quote and comma */
 				}
-				WriteNumber( *cSrc++ );						/* write as numeric outside quotes */
+				WriteNumber( *cSrc == 10 ? 13 : *cSrc );						/* write as numeric outside quotes */
+				cSrc++;
 				nStart = 1;
 			}
 			else
@@ -3391,7 +3392,7 @@ void CR_Key( void )
 		//	sprintf( szInstruction, "ldy #%d", nArg );	/* get key from table. */
 		//	WriteInstruction( szInstruction );
 			LoadYRegister(nArg);
-			WriteInstruction( "lda keys,y" );
+			WriteInstruction( "lda keys + data_address - data_start,y" );
 			WriteInstruction( "jsr ktest" );					/* test it. */
 			WriteInstruction( "bcc :+" );
 			WriteInstruction( "jmp       " );
@@ -3401,7 +3402,7 @@ void CR_Key( void )
 	{
 		CompileKnownArgument( nArg );							/* puts argument into accumulator. */
 		WriteInstruction( "tay" );						/* keys. */
-		WriteInstruction( "lda keys,y" );							/* key number in de. */
+		WriteInstruction( "lda keys + data_address - data_start,y" );							/* key number in de. */
 		WriteInstruction( "jsr ktest" );						/* test it now. */
 		WriteInstruction( "bcc :+" );
 		WriteInstruction( "jmp       " );
@@ -3424,7 +3425,7 @@ void CR_DefineKey( void )
 	LoadARegister(Joystick(nNum));
 	WriteInstruction( "tax" );
 	WriteInstruction( "jsr kget" );
-	WriteInstruction( "sta keys,x" );
+	WriteInstruction( "sta keys + data_address - data_start,x" );
 	InvalidateARegister();
 
 //	WriteInstruction( "call 654" );
@@ -4300,11 +4301,13 @@ void CR_Divide( void )
 
 void CR_SpriteInk( void )
 {
-//	CompileArgument();
-//	WriteInstruction( "and #7" );
+	CompileArgument();
+	WriteInstruction( "and #7" );
+	WriteInstruction("sta spriteink");
+
 //	WriteInstruction( "sta z80_c" );
 //	WriteInstruction( "jsr cspr" );
-	WriteInstruction( "; SPRITEINK command" );
+//	WriteInstruction( "; SPRITEINK command" );
 }
 
 void CR_Trail( void )
@@ -4687,17 +4690,17 @@ void CR_ControlMenu( void )
 	WriteInstruction( "jsr vsync" );
 	WriteInstruction( "lda #0" );
 	WriteInstruction( "sta contrl" );
-	WriteInstruction( "lda keys+7" );
+	WriteInstruction( "lda keys + data_address - data_start+7" );
 	WriteInstruction( "jsr ktest" );
 	WriteInstruction( "bcc rtcon1" );
 	WriteInstruction( "lda #1" );
 	WriteInstruction( "sta contrl" );
-	WriteInstruction( "lda keys+8" );
+	WriteInstruction( "lda keys + data_address - data_start+8" );
 	WriteInstruction( "jsr ktest" );
 	WriteInstruction( "bcc rtcon1" );
 	WriteInstruction( "lda #2" );
 	WriteInstruction( "sta contrl" );
-	WriteInstruction( "lda keys+9" );
+	WriteInstruction( "lda keys + data_address - data_start+9" );
 	WriteInstruction( "jsr ktest" );
 	WriteInstruction( "bcs rtcon" );
 	WriteInstruction( "rtcon1:" );

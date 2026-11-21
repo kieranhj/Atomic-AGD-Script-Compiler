@@ -4,8 +4,8 @@
 /*   Atom version written by Kees van Oss 2018             */
 
 //#define _ENABLE_BRANCH_OPTIMISATION
-//#define _ENABLE_A_OPTIMISATION
-//#define _ENABLE_Y_OPTIMISATION
+#define _ENABLE_A_OPTIMISATION
+#define _ENABLE_Y_OPTIMISATION
 #define _ENABLE_MODE1
 
 #include <stdio.h>
@@ -1531,7 +1531,8 @@ unsigned char ink_to_mode1[8][2] =
 	{ 0x0f, 0x0f },	// solid 1
 	{ 0xf0, 0xf0 }, // solid 2
 	{ 0x5a, 0xa5 }, // stipple 1,2
-	{ 0xda, 0xa7 }, // stripple 1,2,3
+	{ 0xa5, 0x5a }, // stipple 2,1
+//	{ 0xda, 0xa7 }, // stripple 1,2,3
 	{ 0x5f, 0xaf }, // stipple 1,3
 	{ 0xf5, 0xfa }, // stipple 2,3
 	{ 0xff, 0xff }, // solid 3
@@ -4302,8 +4303,12 @@ void CR_Divide( void )
 void CR_SpriteInk( void )
 {
 	CompileArgument();
-	WriteInstruction( "and #7" );
-	WriteInstruction("sta spriteink");
+//	WriteInstruction( "and #7" );
+//	WriteInstruction("sta spriteink");
+
+	WriteInstruction("and #7");
+	SaveSpriteParameter(18);	// newInk
+	InvalidateARegister();
 
 //	WriteInstruction( "sta z80_c" );
 //	WriteInstruction( "jsr cspr" );

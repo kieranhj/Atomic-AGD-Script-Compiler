@@ -1,2 +1,2 @@
-AGD: AGD6.c
-	gcc -o AGD AGD6.c
+AGD.exe: AGD6.c
+	gcc -o AGD.exe AGD6.c
